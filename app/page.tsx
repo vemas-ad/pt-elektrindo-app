@@ -1,83 +1,105 @@
 "use client";
-import React from "react";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
-export default function LoginPage(): React.ReactElement {
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(false);
+
+  // ✅ Cek apakah user sudah login sebelumnya
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.push("/dashboard/master");
+      }
+    };
+    checkSession();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
-    // sign in
-    const { error: signError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data: signData, error: signError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-    if (signError) {
-      alert("Login gagal: " + signError.message);
+      if (signError) {
+        alert("Login gagal: " + signError.message);
+        return;
+      }
+
+      // ✅ Ambil role user dari tabel "users"
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("email", email)
+        .single();
+
+      if (userError || !userData) {
+        alert("User tidak ditemukan di tabel users.");
+        return;
+      }
+
+      const role = userData.role;
+
+      if (role === "master") {
+        router.push("/dashboard/master");
+      } else {
+        router.push("/dashboard/silver");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Terjadi kesalahan saat login.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Ambil role user dari tabel users
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("email", email)
-      .single();
-
-    setLoading(false);
-
-    if (userError || !userData) {
-      alert("User tidak ditemukan di tabel users.");
-      return;
-    }
-
-    const role = (userData as { role: string }).role;
-
-    if (role === "master") router.push("/dashboard/master");
-    else router.push("/dashboard/silver");
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm rounded bg-white p-6 shadow"
+        className="w-full max-w-sm rounded-lg bg-white p-6 shadow-md"
       >
-        <h1 className="mb-4 text-center text-2xl font-bold">
+        <h1 className="mb-6 text-center text-2xl font-bold text-gray-800">
           Login PT Elektrindo
         </h1>
 
-        <label className="mb-2 block text-sm font-medium">Email</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Email
+        </label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="mb-3 w-full rounded border px-3 py-2"
+          className="mb-4 w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
         />
 
-        <label className="mb-2 block text-sm font-medium">Password</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Password
+        </label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="mb-4 w-full rounded border px-3 py-2"
+          className="mb-6 w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
         />
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-60"
+          className="w-full rounded bg-blue-600 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-60"
         >
           {loading ? "Memproses..." : "Login"}
         </button>
