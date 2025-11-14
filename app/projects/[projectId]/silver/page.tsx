@@ -1195,7 +1195,7 @@ export default function SilverPage(): JSX.Element {
         <div className="flex items-center gap-4">
           {!logoError ? (
             <img 
-              src="/logo_eltama.png" 
+              src="/logo-eltama.png" 
               alt="PT Elektrindo Utama Indonesia" 
               style={{ width: 140 }}
               onError={() => setLogoError(true)}
