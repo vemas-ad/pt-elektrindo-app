@@ -10,12 +10,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ Cek apakah user sudah login sebelumnya
+  // ✅ Jika user sudah login, arahkan langsung ke /projects
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        router.push("/dashboard/master");
+        router.push("/projects");
       }
     };
     checkSession();
@@ -26,11 +26,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data: signData, error: signError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { data: signData, error: signError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (signError) {
         alert("Login gagal: " + signError.message);
@@ -49,13 +48,11 @@ export default function LoginPage() {
         return;
       }
 
-      const role = userData.role;
+      // Simpan role untuk akses dashboard
+      localStorage.setItem("userRole", userData.role);
 
-      if (role === "master") {
-        router.push("/dashboard/master");
-      } else {
-        router.push("/dashboard/silver");
-      }
+      // ✅ Arahkan ke halaman pilihan proyek
+      router.push("/projects");
     } catch (error) {
       console.error(error);
       alert("Terjadi kesalahan saat login.");

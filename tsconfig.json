@@ -38,7 +38,7 @@
     ".next\\dev/types/**/*.ts",
     ".next\\dev/types/**/*.ts",
     "next.config.js"
-  ],
+, "app/dashboard/silver/master/page.js", "app/components/MapTracking.tsx"  ],
   "exclude": [
     "node_modules"
   ]
