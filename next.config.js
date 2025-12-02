@@ -1,9 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   experimental: {
-    appDir: true,
+    serverComponentsExternalPackages: ['formidable'],
   },
-};
+  api: {
+    bodyParser: false,
+  },
+}
 
-export default nextConfig;
+module.exports = nextConfig

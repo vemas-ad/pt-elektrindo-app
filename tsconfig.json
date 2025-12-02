@@ -15,7 +15,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -37,8 +37,10 @@
     "**/*.mts",
     ".next\\dev/types/**/*.ts",
     ".next\\dev/types/**/*.ts",
-    "next.config.js"
-, "app/dashboard/silver/master/page.js", "app/components/MapTracking.tsx"  ],
+    "next.config.js",
+    "app/dashboard/silver/master/page.js",
+    "app/components/MapTracking.tsx"
+  ],
   "exclude": [
     "node_modules"
   ]

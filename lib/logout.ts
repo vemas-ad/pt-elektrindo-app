@@ -7,6 +7,12 @@ export const handleLogout = async () => {
     console.error("Logout gagal:", error.message);
     alert("Logout gagal, coba lagi.");
   } else {
+    // Hapus semua data dari localStorage
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userProfile");
+    localStorage.removeItem("selectedProject");
+    
     window.location.href = "/"; // Arahkan ke halaman login
   }
 };
