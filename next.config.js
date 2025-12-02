@@ -1,11 +1,29 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // HAPUS SEMUA experimental yang error
+  // experimental: {  // HAPUS BAGIAN INI
+  //   serverComponentsExternalPackages: ['@supabase/supabase-js']
+  // },
+  
+  // GUNAKAN INI:
+  serverExternalPackages: ['@supabase/supabase-js'],
+  
+  // HAPUS 'api' dari root, pindahkan ke sini:
   experimental: {
-    serverComponentsExternalPackages: ['formidable'],
+    serverActions: {
+      bodySizeLimit: '10mb'
+    }
   },
-  api: {
-    bodyParser: false,
+  
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/**',
+      },
+    ],
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
