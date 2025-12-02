@@ -536,15 +536,14 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
 
 // PERBAIKAN: Komponen User Profile untuk menampilkan email dan gambar profil
 const UserProfile = () => {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<string | null>(null);
 
-  useEffect(() => {
-    const email = localStorage.getItem("userEmail");
-    const profile = localStorage.getItem("userProfile");
-    setUserEmail(email);
-    setUserProfile(profile);
-  }, []);
+useEffect(() => {
+  if (typeof window !== 'undefined') {
+    setUserEmail(localStorage.getItem("userEmail"));
+  }
+}, []);
 
   if (!userEmail) return null;
 

@@ -1,26 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // HAPUS SEMUA experimental yang error
-  // experimental: {  // HAPUS BAGIAN INI
-  //   serverComponentsExternalPackages: ['@supabase/supabase-js']
-  // },
+  reactStrictMode: true,
+  swcMinify: true,
   
-  // GUNAKAN INI:
+  // INI YANG BENAR:
   serverExternalPackages: ['@supabase/supabase-js'],
   
-  // HAPUS 'api' dari root, pindahkan ke sini:
+  // HAPUS SEMUA 'experimental' yang bermasalah
+  // JANGAN ada: experimental: { serverComponentsExternalPackages: [...] }
+  
+  // Untuk body size limit
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb'
     }
   },
   
+  // Image domains
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
-        pathname: '/**',
+        hostname: '**', // Allow all HTTPS images
       },
     ],
   },
