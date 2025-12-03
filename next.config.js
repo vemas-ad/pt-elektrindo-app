@@ -3,25 +3,18 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
-  // INI YANG BENAR:
+  // HANYA INI yang boleh ada:
   serverExternalPackages: ['@supabase/supabase-js'],
   
-  // HAPUS SEMUA 'experimental' yang bermasalah
-  // JANGAN ada: experimental: { serverComponentsExternalPackages: [...] }
+  // HAPUS SEMUA yang lain:
+  // JANGAN ADA experimental: { serverComponentsExternalPackages: [...] }
+  // JANGAN ADA api: { ... } di root
   
-  // Untuk body size limit
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb'
-    }
-  },
-  
-  // Image domains
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**', // Allow all HTTPS images
+        hostname: '**',
       },
     ],
   },
