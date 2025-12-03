@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import NextDynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
 import { supabase, supabase2, DualStorage } from "../../../../lib/supabaseClient";
 import {
@@ -21,8 +21,16 @@ import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const Spreadsheet = dynamic(() => import("react-spreadsheet"), { ssr: false });
-const MapTracking = dynamic(() => import("../../../components/MapTracking"), { ssr: false });
+const Spreadsheet = NextDynamic(() => import("react-spreadsheet"), { ssr: false });
+const MapTracking = NextDynamic(() => import("../../../components/MapTracking"), { ssr: false });
+
+// TAMBAHKAN function ini setelah imports:
+const getLocalStorageSafe = (key: string): string | null => {
+  if (typeof window === 'undefined') {
+    return null; // Return null di server
+  }
+  return localStorage.getItem(key);
+};
 
 function debounceFn<T extends (...args: any[]) => any>(fn: T, wait = 1000) {
   let timeout: any;
@@ -534,16 +542,25 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   );
 };
 
-// PERBAIKAN: Komponen User Profile untuk menampilkan email dan gambar profil
+// ============ PERBAIKAN UTAMA: Komponen User Profile dengan localStorage yang AMAN ============
 const UserProfile = () => {
-const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-useEffect(() => {
-  if (typeof window !== 'undefined') {
-    setUserEmail(localStorage.getItem("userEmail"));
-  }
-}, []);
+  useEffect(() => {
+    setMounted(true);
+    // PERBAIKAN: Hanya akses localStorage di client-side
+    if (typeof window !== 'undefined') {
+      const email = localStorage.getItem("userEmail");
+      const profile = localStorage.getItem("userProfile");
+      setUserEmail(email);
+      setUserProfile(profile);
+    }
+  }, []);
+
+  // PERBAIKAN: Jangan render apa-apa saat server-side rendering
+  if (!mounted) return null;
 
   if (!userEmail) return null;
 
@@ -557,7 +574,7 @@ useEffect(() => {
       <div>
         <div className="text-sm font-medium text-gray-800">{userEmail}</div>
         <div className="text-xs text-gray-500 capitalize">
-          {localStorage.getItem("userRole")}
+          {typeof window !== 'undefined' ? localStorage.getItem("userRole") : ''}
         </div>
       </div>
     </div>
@@ -669,12 +686,12 @@ const ExportPrintControls = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  useEffect(() => {
-    const email = localStorage.getItem("userEmail");
-    setUserEmail(email);
-  }, []);
+useEffect(() => {
+  const email = getLocalStorageSafe("userEmail");
+  setUserEmail(email);
+}, []);
 
   // Fungsi untuk mendapatkan informasi user yang melakukan aksi
   const getUserInfo = () => {
@@ -2144,8 +2161,14 @@ export default function SilverPage(): JSX.Element {
   const [onlineUsers, setOnlineUsers] = useState<UserPresenceType[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showDeleteDate, setShowDeleteDate] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<string | null>(null);
+// GANTI dengan:
+const [userEmail, setUserEmail] = useState<string | null>(null);
+const [userProfile, setUserProfile] = useState<string | null>(null);
+
+useEffect(() => {
+  setUserEmail(getLocalStorageSafe("userEmail"));
+  setUserProfile(getLocalStorageSafe("userProfile"));
+}, []);
 
   const undoStack = useRef<TaskType[][]>([]);
   const redoStack = useRef<TaskType[][]>([]);
@@ -4987,5 +5010,9 @@ export default function SilverPage(): JSX.Element {
         </div>
       </div>
     </div>
+    
   );
 } 
+
+
+export const revalidate = 0;
