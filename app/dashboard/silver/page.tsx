@@ -1,10 +1,11 @@
 ﻿// app/dashboard/silver/page.tsx
 "use client";
+export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
 // react-data-grid menggunakan named export DataGrid
 import DataGrid from "react-data-grid";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import {
@@ -19,7 +20,7 @@ import {
 } from "recharts";
 import { handleLogout } from "@/lib/logout";
 
-const MapTracking = dynamic(() => import("../../components/MapTracking"), {
+const MapTracking = nextDynamic(() => import("../../components/MapTracking"), {
   ssr: false,
 });
 
@@ -28,9 +29,16 @@ export default function SilverDashboard() {
   const [user, setUser] = useState<any>(null);
   const [rows, setRows] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [projectName, setProjectName] = useState(
-    localStorage.getItem("selectedProject") || "Battery Test Project"
-  );
+const [projectName, setProjectName] = useState("Battery Test Project");
+
+useEffect(() => {
+  const saved = typeof window !== "undefined"
+    ? localStorage.getItem("selectedProject")
+    : null;
+
+  if (saved) setProjectName(saved);
+}, []);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

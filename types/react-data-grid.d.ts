@@ -6,7 +6,9 @@
   export default DataGrid;
 
   // Named export (untuk import { DataGrid, Column, RenderCellProps } from "react-data-grid")
-  export const DataGrid as NamedDataGrid: any;
+export const DataGrid: any;
+export { DataGrid as NamedDataGrid };
+
 
   // Generic Column type yang longgar — mendukung properti kustom seperti renderCell / renderEditCell
   export type Column<R = any, K = unknown> = {

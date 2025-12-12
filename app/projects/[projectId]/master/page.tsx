@@ -58,7 +58,7 @@ type NoteType = {
   updated_at: string;
 };
 
-export default function MasterProjectPage(): JSX.Element {
+export default function MasterDashboard(): React.JSX.Element {
   const router = useRouter();
   const params = useParams();
   const projectId = (params as any)?.projectId as string | undefined;
