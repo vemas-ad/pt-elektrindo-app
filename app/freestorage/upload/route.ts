@@ -2,19 +2,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client
+// Buat Supabase client dengan Service Role key untuk server-side
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for server-side
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const projectId = formData.get('projectId') as string;
-    const taskId = formData.get('taskId') as string;
-    const description = formData.get('description') as string;
+    const file = formData.get('file') as File | null;
+    const projectId = (formData.get('projectId') as string) || '';
+    const taskId = (formData.get('taskId') as string) || '';
+    const description = (formData.get('description') as string) || 'task';
 
     if (!file) {
       return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📁 Processing file for Supabase Storage:', file.name);
 
-    // Validasi file
+    // Validasi file size
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
         { success: false, error: 'File terlalu besar. Maksimal 10MB.' },
@@ -49,15 +49,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate nama file yang unik
-    const fileExtension = file.name.split('.').pop();
-    const timestamp = new Date().getTime();
-    const safeDescription = (description || `task`).replace(/[^a-zA-Z0-9]/g, '_');
+    // Generate nama file unik
+    const fileExtension = file.name.split('.').pop() ?? 'dat';
+    const timestamp = Date.now();
+    const safeDescription = description.replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${projectId}/${safeDescription}_${timestamp}.${fileExtension}`;
 
     console.log('📤 Uploading to Supabase Storage:', fileName);
 
-    // Convert file to ArrayBuffer
+    // Convert file ke Uint8Array
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -72,23 +72,21 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('❌ Supabase upload error:', error);
-      throw new Error(`Upload gagal: ${error.message}`);
+      return NextResponse.json(
+        { success: false, error: `Upload gagal: ${error.message}` },
+        { status: 500 }
+      );
     }
 
-    console.log('✅ Upload successful:', data);
-
-    // Dapatkan URL publik
+    // Ambil public URL
     const { data: urlData } = supabase.storage
       .from('proofs')
       .getPublicUrl(fileName);
 
-    const publicUrl = urlData.publicUrl;
-    console.log('🔗 Public URL:', publicUrl);
+    const publicUrl = urlData?.publicUrl || '';
 
-    // Simpan URL ke database jika ada taskId
+    // Simpan URL ke DB jika ada taskId
     if (taskId) {
-      console.log('💾 Saving to database for task:', taskId);
-      
       const { error: updateError } = await supabase
         .from('tasks')
         .update({ 
@@ -98,29 +96,24 @@ export async function POST(request: NextRequest) {
         .eq('id', taskId);
 
       if (updateError) {
-        console.error('❌ Database update error:', updateError);
-        // Tetap return success karena upload sudah berhasil
-      } else {
-        console.log('✅ Database update successful');
+        console.warn('⚠ Database update failed (upload tetap berhasil):', updateError.message);
       }
     }
 
     return NextResponse.json({
       success: true,
       fileName: file.name,
-      publicUrl: publicUrl,
+      publicUrl,
       filePath: fileName,
       message: 'File berhasil diupload ke Supabase Storage!'
     });
 
-  } catch (error: any) {
-    console.error('💥 Upload error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: `Upload gagal: ${error.message}`,
-      step: 'upload_process'
-    }, { status: 500 });
+  } catch (err: any) {
+    console.error('💥 Upload error:', err);
+    return NextResponse.json(
+      { success: false, error: `Upload gagal: ${err.message}` },
+      { status: 500 }
+    );
   }
 }
 
@@ -137,35 +130,32 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Extract file path dari URL
-    const urlParts = fileUrl.split('/');
-    const fileName = urlParts[urlParts.length - 1];
+    // Ambil file path dari URL
+    const fileName = fileUrl.split('/').slice(-1)[0];
     const filePath = `${projectId}/${fileName}`;
 
     console.log('🗑️ Deleting file:', filePath);
 
-    const { error } = await supabase.storage
-      .from('proofs')
-      .remove([filePath]);
+    const { error } = await supabase.storage.from('proofs').remove([filePath]);
 
     if (error) {
-      console.error('❌ Delete error:', error);
-      throw error;
+      console.error('❌ Delete error:', error.message);
+      return NextResponse.json(
+        { success: false, error: `Delete gagal: ${error.message}` },
+        { status: 500 }
+      );
     }
-
-    console.log('✅ File deleted successfully');
 
     return NextResponse.json({
       success: true,
       message: 'File berhasil dihapus dari storage'
     });
 
-  } catch (error: any) {
-    console.error('💥 Delete error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: `Delete gagal: ${error.message}`
-    }, { status: 500 });
+  } catch (err: any) {
+    console.error('💥 Delete error:', err);
+    return NextResponse.json(
+      { success: false, error: `Delete gagal: ${err.message}` },
+      { status: 500 }
+    );
   }
 }

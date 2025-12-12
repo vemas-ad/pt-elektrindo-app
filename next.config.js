@@ -1,15 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // pengganti experimental.serverComponentsExternalPackages
-  serverExternalPackages: ['formidable'],
+  reactStrictMode: true,
 
-  // API configuration (replacement for invalid "api" root-level key)
-  api: {
-    bodyParser: false, // tetap disable bodyParser (AMAN untuk upload)
+  experimental: {
+    serverComponentsExternalPackages: ["formidable"],
   },
-
-  // Jika kamu masih butuh experimental lainnya, boleh ditaruh di sini
-  experimental: {},
 };
 
 module.exports = nextConfig;

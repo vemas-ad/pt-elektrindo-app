@@ -2473,44 +2473,44 @@ const UploadSection = ({
   activeTab: number;
 }) => {
   const [showUploadSection, setShowUploadSection] = useState(false);
-  
+
   const [uploadStatusMap, setUploadStatusMap] = useState<Map<string, boolean>>(new Map());
-  
+
   useEffect(() => {
     if (!projectId) return;
     
     const savedStatusKey = `upload_status_${projectId}_tab${activeTab}`;
     const savedStatus = localStorage.getItem(savedStatusKey);
-    
+
     if (savedStatus) {
       try {
-        const parsedStatus = JSON.parse(savedStatus);
-        const statusMap = new Map<string, boolean>();
-        
-        Object.entries(parsedStatus).forEach(([key, value]) => {
-          statusMap.set(key, value as boolean);
-        });
-        
-        setUploadStatusMap(statusMap);
-      } catch (e) {
-        console.error('Error loading upload status:', e);
+        const parsed = JSON.parse(savedStatus) as Record<string, boolean>;
+        const map = new Map<string, boolean>(Object.entries(parsed));
+        setUploadStatusMap(map);
+      } catch (err) {
+        console.error("Failed parsing saved upload status:", err);
       }
     }
   }, [projectId, activeTab]);
+
   
   const saveUploadStatus = (rowKey: string, status: boolean) => {
     const newStatusMap = new Map(uploadStatusMap);
     newStatusMap.set(rowKey, status);
     
-    setUploadStatusMap(newStatusMap);
-    
-    const statusObject: Record<string, boolean> = {};
-    newStatusMap.forEach((value, key) => {
-      statusObject[key] = value;
-    });
-    
-    localStorage.setItem(`upload_status_${projectId}_tab${activeTab}`, JSON.stringify(statusObject));
-  };
+setUploadStatusMap(newStatusMap as Map<string, boolean>);
+
+const statusObject: Record<string, boolean> = {};
+(newStatusMap as Map<string, boolean>).forEach((value, key) => {
+  statusObject[key] = value;
+});
+
+localStorage.setItem(
+  `upload_status_${projectId}_tab${activeTab}`,
+  JSON.stringify(statusObject)
+);
+};
+
   
   useEffect(() => {
     const currentRowKeys = currentRows.map((row, index) => {
@@ -3745,7 +3745,7 @@ const retryFailedLocations = async () => {
 };
 
 // ============ Komponen utama ============
-export default function SilverPage(): JSX.Element {
+export default function SilverPage(): React.JSX.Element {
   const router = useRouter();
   const params = useParams();
   const projectId = (params as any)?.projectId as string | undefined;
