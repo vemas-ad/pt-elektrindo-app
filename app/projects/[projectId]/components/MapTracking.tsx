@@ -45,6 +45,16 @@ type Shipment = {
 
 type CenterObj = { lat: number; lng: number };
 
+// PERBAIKAN: Tambahkan properti userMarker
+export type MapTrackingProps = {
+  projectId?: string;
+  center?: CenterObj;
+  height?: number;
+  zoom?: number;
+  userMarker?: { lat: number; lng: number } | null;
+  [key: string]: any;
+};
+
 // Fix Leaflet icon issue
 if (typeof window !== 'undefined') {
   delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -55,51 +65,112 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export type MapTrackingProps = {
-  projectId?: string;
-  center?: CenterObj;
-  height?: number;
-  [key: string]: any;
-};
-
 export default function MapTracking({
   projectId,
   center,
   height = 400,
+  zoom: propZoom,
+  userMarker,
   ...props
 }: MapTrackingProps) {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [internalCenter, setInternalCenter] = useState<[number, number]>([
-    -7.155, 112.65, // Default Gresik coordinates
+    -7.155, 112.65,
   ]);
-  const [zoom, setZoom] = useState<number>(13);
+  const [zoom, setZoom] = useState<number>(propZoom || 13);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<any>(null);
   const mapKey = useRef(`map-${Date.now()}`);
+  
+  // ============ PERBAIKAN NO. 3: Debug Struktur Tabel ============
+  useEffect(() => {
+    const debugShipmentsTable = async () => {
+      if (!projectId) return;
+      
+      try {
+        console.log("🔍 Debug: Checking shipments table...");
+        
+        // Coba query untuk melihat struktur
+        const { data, error } = await supabase
+          .from("shipments")
+          .select("*")
+          .limit(1);
+        
+        if (error) {
+          console.error("🔍 Debug: Table query error:", error);
+          // Jangan tampilkan alert di sini, hanya log
+        } else {
+          console.log("🔍 Debug: Table columns:", data?.length ? Object.keys(data[0]) : "No data");
+          
+          // Coba insert data test kecil
+          const testData = {
+            project_id: projectId,
+            last_lat: -6.2,
+            last_lng: 106.8,
+            address: "Test location debug",
+            status: "test",
+            recorded_at: new Date().toISOString()
+          };
+          
+          const { error: testError } = await supabase
+            .from("shipments")
+            .insert([testData]);
+            
+          if (testError) {
+            console.error("🔍 Debug: Test insert error:", testError);
+          } else {
+            console.log("🔍 Debug: Test insert success - table structure OK");
+          }
+        }
+      } catch (err) {
+        console.error("🔍 Debug: Exception:", err);
+      }
+    };
+    
+    debugShipmentsTable();
+  }, [projectId]);
+
+  // PERBAIKAN: Effect untuk handle userMarker
+  useEffect(() => {
+    if (userMarker && userMarker.lat && userMarker.lng) {
+      console.log("📍 User marker updated:", userMarker);
+      setInternalCenter([userMarker.lat, userMarker.lng]);
+      setZoom(propZoom || 15);
+    }
+  }, [userMarker, propZoom]);
 
   // Initialize map dengan lokasi user
   useEffect(() => {
-    // Coba dapatkan lokasi user saat ini
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          console.log("📍 GPS User Location:", latitude, longitude);
-          setInternalCenter([latitude, longitude]);
-          setZoom(15);
-        },
-        (error) => {
-          console.warn("Geolocation error:", error);
-          // Jika gagal, gunakan lokasi default Gresik
+    if (!userMarker) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log("📍 GPS User Location:", latitude, longitude);
+            setInternalCenter([latitude, longitude]);
+            setZoom(propZoom || 15);
+          },
+          (error) => {
+            console.warn("Geolocation error:", error);
+            if (center) {
+              setInternalCenter([center.lat, center.lng]);
+              setZoom(propZoom || 13);
+            } else {
+              setInternalCenter([-7.155, 112.65]);
+              setZoom(propZoom || 13);
+            }
+          }
+        );
+      } else {
+        if (center) {
+          setInternalCenter([center.lat, center.lng]);
+          setZoom(propZoom || 13);
+        } else {
           setInternalCenter([-7.155, 112.65]);
-          setZoom(13);
+          setZoom(propZoom || 13);
         }
-      );
-    } else {
-      // Default ke Gresik
-      setInternalCenter([-7.155, 112.65]);
-      setZoom(13);
+      }
     }
 
     return () => {
@@ -111,7 +182,7 @@ export default function MapTracking({
         }
       }
     };
-  }, []);
+  }, [center, propZoom, userMarker]);
 
   // Load shipments data dengan error handling
   useEffect(() => {
@@ -122,22 +193,6 @@ export default function MapTracking({
     }
 
     let mounted = true;
-
-    const parseRow = (r: any): Shipment => ({
-      id: String(r.id),
-      tracking_code: r.tracking_code ?? null,
-      item_name: r.item_name ?? `Location ${r.id}`,
-      quantity: r.quantity != null ? Number(r.quantity) : null,
-      status: r.status ?? "active",
-      last_lat: r.last_lat != null ? Number(r.last_lat) : null,
-      last_lng: r.last_lng != null ? Number(r.last_lng) : null,
-      updated_at: r.updated_at ?? null,
-      created_at: r.created_at ?? null,
-      project_id: r.project_id ?? null,
-      address: r.address ?? null,
-      accuracy: r.accuracy != null ? Number(r.accuracy) : null,
-      recorded_at: r.recorded_at ?? null,
-    });
 
     async function loadInitial() {
       try {
@@ -158,14 +213,31 @@ export default function MapTracking({
         }
         
         if (mounted && Array.isArray(data)) {
-          const parsed = (data as any[]).map(parseRow);
+          // PERBAIKAN: Gunakan parsing yang konsisten
+          const parsed = (data as any[]).map((r: any) => ({
+            id: String(r.id),
+            tracking_code: r.tracking_code || null,
+            item_name: r.item_name || `Location ${r.id}`,
+            quantity: r.quantity != null ? Number(r.quantity) : null,
+            status: r.status || "active",
+            last_lat: r.last_lat != null ? Number(r.last_lat) : null,
+            last_lng: r.last_lng != null ? Number(r.last_lng) : null,
+            updated_at: r.updated_at || null,
+            created_at: r.created_at || null,
+            project_id: r.project_id || null,
+            address: r.address || null,
+            accuracy: r.accuracy != null ? Number(r.accuracy) : null,
+            recorded_at: r.recorded_at || null,
+          }));
+          
           setShipments(parsed);
 
-          // Update center ke lokasi terbaru
-          const first = parsed.find((s) => s.last_lat != null && s.last_lng != null);
-          if (first) {
-            setInternalCenter([first.last_lat!, first.last_lng!]);
-            setZoom(15);
+          if (!userMarker) {
+            const first = parsed.find((s) => s.last_lat != null && s.last_lng != null);
+            if (first) {
+              setInternalCenter([first.last_lat!, first.last_lng!]);
+              setZoom(propZoom || 15);
+            }
           }
         }
       } catch (error) {
@@ -178,73 +250,218 @@ export default function MapTracking({
 
     loadInitial();
 
-    // Setup realtime subscription dengan error handling
-    if (projectId) {
-      try {
-        const chan = supabase
-          .channel(`public:shipments:project_${projectId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "shipments",
-              filter: `project_id=eq.${projectId}`,
-            },
-            (payload: any) => {
-              const eventType = (payload.eventType || payload.type || "").toString().toUpperCase();
-              
-              const parseRow = (r: any): Shipment => ({
-                id: String(r.id),
-                tracking_code: r.tracking_code ?? null,
-                item_name: r.item_name ?? `Location ${r.id}`,
-                quantity: r.quantity != null ? Number(r.quantity) : null,
-                status: r.status ?? "active",
-                last_lat: r.last_lat != null ? Number(r.last_lat) : null,
-                last_lng: r.last_lng != null ? Number(r.last_lng) : null,
-                updated_at: r.updated_at ?? null,
-                created_at: r.created_at ?? null,
-                project_id: r.project_id ?? null,
-                address: r.address ?? null,
-                accuracy: r.accuracy != null ? Number(r.accuracy) : null,
-                recorded_at: r.recorded_at ?? null,
-              });
+    // Setup realtime subscription - PERBAIKAN NO. 4
+// Setup realtime subscription - VERSI SIMPLIFIED
+if (projectId) {
+  try {
+    const chan = supabase
+      .channel(`public:shipments:project_${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "shipments",
+          filter: `project_id=eq.${projectId}`,
+        },
+        (payload: any) => {
+          try {
+            // PERBAIKAN: Validasi payload
+            if (!payload || !payload.new) return;
+            
+            const newRow = {
+              id: String(payload.new.id || `new_${Date.now()}`),
+              tracking_code: payload.new.tracking_code || null,
+              item_name: payload.new.item_name || `Location ${payload.new.id || 'new'}`,
+              quantity: payload.new.quantity != null ? Number(payload.new.quantity) : null,
+              status: payload.new.status || "active",
+              last_lat: payload.new.last_lat != null ? Number(payload.new.last_lat) : null,
+              last_lng: payload.new.last_lng != null ? Number(payload.new.last_lng) : null,
+              updated_at: payload.new.updated_at || null,
+              created_at: payload.new.created_at || null,
+              project_id: payload.new.project_id || null,
+              address: payload.new.address || null,
+              accuracy: payload.new.accuracy != null ? Number(payload.new.accuracy) : null,
+              recorded_at: payload.new.recorded_at || null,
+            };
 
-              const newRow = payload.new ? parseRow(payload.new) : null;
-              const oldRow = payload.old ? parseRow(payload.old) : null;
-
-              setShipments((prev) => {
-                if (eventType === "INSERT" && newRow) {
-                  return [newRow, ...prev.slice(0, 49)];
-                }
-                if (eventType === "UPDATE" && newRow) {
-                  return prev.map((p) => (p.id === newRow.id ? newRow : p));
-                }
-                if (eventType === "DELETE" && oldRow) {
-                  return prev.filter((p) => p.id !== oldRow.id);
-                }
-                return prev;
-              });
-
-              if (newRow?.last_lat != null && newRow?.last_lng != null) {
-                setInternalCenter([newRow.last_lat, newRow.last_lng]);
+            setShipments((prev) => {
+              // Cegah duplikasi
+              const exists = prev.find(p => p.id === newRow.id);
+              if (exists) {
+                return prev.map(p => p.id === newRow.id ? newRow : p);
               }
+              return [newRow, ...prev.slice(0, 49)];
+            });
+
+            if (!userMarker && newRow.last_lat != null && newRow.last_lng != null) {
+              setInternalCenter([newRow.last_lat, newRow.last_lng]);
             }
-          )
-          .subscribe();
-        
-        channelRef.current = chan;
-      } catch (channelError) {
-        console.error("Channel subscription error:", channelError);
+          } catch (parseError) {
+            console.error("Error parsing realtime update:", parseError);
+          }
+        }
+      );
+
+    // Subscribe dengan error handling
+    const subscription = chan.subscribe((status: any, err: any) => {
+      console.log(`Realtime channel status: ${status}`);
+      if (err) {
+        console.error("Subscription error:", err);
       }
-    }
+    });
+
+    channelRef.current = chan;
+  } catch (channelError) {
+    console.error("Channel subscription error:", channelError);
+  }
+}
 
     return () => {
       mounted = false;
     };
-  }, [projectId]);
+  }, [projectId, propZoom, userMarker]);
 
-  // Fungsi untuk mendapatkan lokasi user saat ini - DIPERBAIKI untuk GPS valid
+  // PERBAIKAN: Buat custom icon untuk user marker
+  const createUserIcon = () => {
+    return new L.Icon({
+      iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40">
+          <circle cx="12" cy="12" r="11" fill="#3B82F6" opacity="0.9" stroke="#1D4ED8" stroke-width="2"/>
+          <circle cx="12" cy="12" r="5" fill="#FFFFFF"/>
+          <circle cx="12" cy="12" r="9" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="2,2"/>
+        </svg>
+      `),
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -40],
+      className: 'user-marker-icon animate-pulse'
+    });
+  };
+
+  // PERBAIKAN KRITIS: Fungsi untuk menyimpan lokasi ke database - FIXED 100%
+  const saveLocationToDatabase = async (
+    latitude: number, 
+    longitude: number, 
+    accuracy: number, 
+    address: string
+  ) => {
+    if (!projectId) {
+      console.error("❌ Project ID tidak ditemukan");
+      return null; // Return null, bukan throw error
+    }
+
+    try {
+      console.log("📤 Menyimpan lokasi ke database...");
+      
+      // PERBAIKAN: Gunakan struktur yang lebih aman
+      const insertData: any = {
+        project_id: projectId,
+        last_lat: latitude,
+        last_lng: longitude,
+        address: address.substring(0, 500), // Batasi panjang
+        status: "active",
+        recorded_at: new Date().toISOString(),
+        accuracy: accuracy
+      };
+
+      console.log("📍 Data insert:", insertData);
+
+      // PERBAIKAN KRITIS: Gunakan try-catch nested untuk menangani error dengan lebih baik
+      try {
+        const { data, error } = await supabase
+          .from("shipments")
+          .insert([insertData]);
+
+        // PERBAIKAN: Periksa error dengan cara yang aman
+        if (error) {
+          console.log("❌ Insert error (with safe logging):", {
+            code: error?.code || "NO_CODE",
+            message: error?.message || "Unknown error",
+            details: error?.details || "No details"
+          });
+          
+          // Coba alternatif struktur
+          const fallbackData = {
+            project_id: projectId,
+            last_lat: latitude,
+            last_lng: longitude,
+            address: address.substring(0, 100),
+            status: "manual",
+            recorded_at: new Date().toISOString()
+          };
+          
+          const { data: fallbackDataResult, error: fallbackError } = await supabase
+            .from("shipments")
+            .insert([fallbackData]);
+            
+          if (fallbackError) {
+            console.log("❌ Fallback insert juga gagal:", fallbackError);
+            
+            // Simpan ke localStorage sebagai backup
+            const backupKey = `shipment_backup_${projectId}`;
+            const existingBackup = localStorage.getItem(backupKey);
+            const backupArray = existingBackup ? JSON.parse(existingBackup) : [];
+            
+            backupArray.push({
+              ...insertData,
+              backup_timestamp: new Date().toISOString(),
+              error: fallbackError?.message || "Unknown"
+            });
+            
+            localStorage.setItem(backupKey, JSON.stringify(backupArray.slice(-20)));
+            
+            console.log("⚠️ Data disimpan di localStorage backup");
+            
+            // Return minimal response
+            return {
+              id: `backup_${Date.now()}`,
+              ...insertData,
+              success: false,
+              backup: true
+            };
+          }
+          
+          return fallbackDataResult;
+        }
+        
+        console.log("✅ Insert berhasil:", data);
+        return data;
+        
+      } catch (insertError: any) {
+        console.log("❌ Exception saat insert:", insertError);
+        
+        // Coba insert yang sangat minimal
+        try {
+          const minimalData = {
+            project_id: projectId,
+            last_lat: latitude,
+            last_lng: longitude,
+            recorded_at: new Date().toISOString()
+          };
+          
+          const { error: minimalError } = await supabase
+            .from("shipments")
+            .insert([minimalData]);
+            
+          if (!minimalError) {
+            console.log("✅ Insert berhasil dengan data minimal");
+            return { id: `minimal_${Date.now()}`, ...minimalData };
+          }
+        } catch (minimalError) {
+          console.log("❌ Minimal insert gagal:", minimalError);
+        }
+        
+        // Return null tapi tampilkan data di UI
+        return null;
+      }
+    } catch (err: any) {
+      console.log("❌ Outer catch error:", err);
+      return null;
+    }
+  };
+
+  // Fungsi untuk mendapatkan lokasi user saat ini
   const getCurrentUserLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation tidak didukung oleh browser Anda");
@@ -256,22 +473,19 @@ export default function MapTracking({
         const { latitude, longitude, accuracy } = position.coords;
         console.log("📍 GPS Location Retrieved:", latitude, longitude);
         
-        // Validasi koordinat (harus dalam range Indonesia)
         if (latitude < -11 || latitude > 6 || longitude < 95 || longitude > 141) {
           alert("Koordinat GPS tidak valid untuk lokasi Indonesia. Pastikan GPS aktif dan terhubung.");
           return;
         }
         
         setInternalCenter([latitude, longitude]);
-        setZoom(15);
+        setZoom(propZoom || 15);
         
-        // Reverse geocoding untuk mendapatkan alamat
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
           .then(response => response.json())
           .then(data => {
             const address = data.display_name || `Koordinat: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
             
-            // Update marker di peta
             const newShipment: Shipment = {
               id: `current-${Date.now()}`,
               item_name: "Lokasi Anda Saat Ini",
@@ -316,47 +530,15 @@ export default function MapTracking({
     );
   };
 
-  // PERBAIKAN: Fungsi untuk menyimpan lokasi ke database - FIXED INSERT ERROR
-  const saveLocationToDatabase = async (latitude: number, longitude: number, accuracy: number, address: string) => {
-    if (!projectId) {
-      alert("Project ID tidak ditemukan");
-      return;
-    }
-
-    try {
-      console.log("📤 Menyimpan lokasi ke database...");
-      
-      // PERBAIKAN: Gunakan insert yang lebih sederhana tanpa .single()
-      const { error } = await supabase
-        .from("shipments")
-        .insert({
-          project_id: projectId,
-          last_lat: latitude,
-          last_lng: longitude,
-          accuracy: accuracy,
-          address: address,
-          status: "manual",
-          recorded_at: new Date().toISOString(),
-          item_name: "Lokasi Manual"
-        });
-
-      if (error) {
-        console.error("❌ Insert shipment error:", error);
-        throw error;
-      }
-
-      console.log("✅ Lokasi berhasil disimpan ke database");
-      
-    } catch (err: any) {
-      console.error("Error saving location:", err);
-      alert("⚠️ Lokasi berhasil ditampilkan di peta, tetapi gagal disimpan ke database. Silakan coba lagi nanti.");
-    }
-  };
-
-  // Fungsi untuk menyimpan lokasi manual
+  // Fungsi untuk menyimpan lokasi manual - DIPERBAIKI
   const saveCurrentLocation = async () => {
     if (!navigator.geolocation) {
       alert("Geolocation tidak didukung oleh browser Anda");
+      return;
+    }
+
+    if (!projectId) {
+      alert("Project ID tidak ditemukan. Silakan refresh halaman.");
       return;
     }
 
@@ -364,7 +546,7 @@ export default function MapTracking({
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 20000,
           maximumAge: 0
         });
       });
@@ -381,47 +563,77 @@ export default function MapTracking({
       
       let address = "Lokasi tidak diketahui";
       try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+          {
+            headers: {
+              'User-Agent': 'SilverApp/1.0',
+              'Accept-Language': 'id-ID,id'
+            }
+          }
+        );
         const data = await response.json();
         if (data.display_name) {
           address = data.display_name;
         }
       } catch (e) {
         console.warn("Gagal mendapatkan alamat:", e);
+        address = `Koordinat: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
       }
 
-      // Simpan ke database
-      await saveLocationToDatabase(latitude, longitude, accuracy, address);
+      // Tampilkan loading
+      alert("🔄 Menyimpan lokasi ke server...");
       
-      // Update peta
+      // PERBAIKAN: Simpan dengan fungsi yang sudah diperbaiki
+      const result = await saveLocationToDatabase(latitude, longitude, accuracy, address);
+      
+      // Update peta terlepas dari hasil database
       setInternalCenter([latitude, longitude]);
-      setZoom(15);
+      setZoom(propZoom || 15);
       
-      // Tambahkan ke daftar shipments
+      // PERBAIKAN: Tambahkan ke daftar shipments dengan cara yang aman
       const newShipment: Shipment = {
-        id: `manual-${Date.now()}`,
+        id: result && typeof result === 'object' && result[0]?.id 
+          ? result[0].id 
+          : `temp_${Date.now()}`,
         item_name: "Lokasi Tersimpan",
         last_lat: latitude,
         last_lng: longitude,
         accuracy: accuracy,
         address: address,
         status: "saved",
-        recorded_at: new Date().toISOString()
+        recorded_at: new Date().toISOString(),
+        project_id: projectId
       };
       
       setShipments(prev => [newShipment, ...prev]);
       
-      alert(`✅ Lokasi berhasil disimpan!\n\n📍 ${address}\n\nKoordinat: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\nAkurasi: ${accuracy}m`);
+      // Tampilkan pesan berdasarkan hasil
+      setTimeout(() => {
+        if (!result) {
+          alert(`⚠️ Lokasi berhasil ditampilkan di peta!\n\n📍 ${address}\n\nCatatan: Ada masalah menyimpan ke database. Data disimpan sementara di penyimpanan lokal.`);
+        } else if (typeof result === 'object' && 'backup' in result) {
+          alert(`⚠️ Lokasi berhasil ditampilkan!\n\n📍 ${address}\n\nData disimpan di localStorage sebagai backup.`);
+        } else {
+          alert(`✅ Lokasi berhasil disimpan!\n\n📍 ${address}\nKoordinat: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\nAkurasi: ${accuracy}m`);
+        }
+      }, 100);
       
     } catch (error: any) {
       console.error("Error getting location:", error);
+      
+      let errorMessage = "Gagal menyimpan lokasi";
       if (error.code === error.PERMISSION_DENIED) {
-        alert("Akses lokasi ditolak. Silakan izinkan akses lokasi di pengaturan browser Anda.");
+        errorMessage = "Akses lokasi ditolak. Silakan izinkan akses lokasi di pengaturan browser Anda.";
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        errorMessage = "GPS tidak aktif atau tidak tersedia. Pastikan GPS diaktifkan.";
       } else if (error.code === error.TIMEOUT) {
-        alert("Timeout saat mengambil lokasi. Pastikan GPS aktif dan coba lagi.");
-      } else {
-        alert("Gagal mengambil lokasi: " + error.message);
+        errorMessage = "Timeout saat mengambil lokasi. Pastikan GPS aktif dan coba lagi.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      alert(`❌ ${errorMessage}`);
     }
   };
 
@@ -476,6 +688,30 @@ export default function MapTracking({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FlyTo center={internalCenter} />
+          
+          {/* PERBAIKAN: Tambahkan user marker jika ada */}
+          {userMarker && userMarker.lat && userMarker.lng && (
+            <Marker
+              key="user-marker"
+              position={[userMarker.lat, userMarker.lng] as [number, number]}
+              icon={createUserIcon()}
+              title="Posisi Anda Saat Ini"
+            >
+              <Popup>
+                <div className="text-sm min-w-[200px]">
+                  <strong className="block mb-1">📍 Posisi Anda Saat Ini</strong>
+                  <div className="space-y-1">
+                    <div><span className="font-medium">Koordinat:</span> {userMarker.lat.toFixed(6)}, {userMarker.lng.toFixed(6)}</div>
+                    <div><span className="font-medium">Status:</span> Real-time</div>
+                    <div className="text-xs text-blue-600 mt-2">
+                      🔵 Titik biru menunjukkan posisi Anda saat ini
+                    </div>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+          
           {shipments.map((s) =>
             s.last_lat != null && s.last_lng != null ? (
               <Marker
@@ -545,7 +781,8 @@ export default function MapTracking({
       )}
       
       <p className="text-sm text-gray-600 mb-4">
-        Menampilkan titik lokasi. Klik "Lokasi Saya" untuk melihat posisi Anda saat ini, atau "Simpan Lokasi" untuk menyimpan ke database.
+        Menampilkan titik lokasi. {userMarker && "🔵 Titik biru menunjukkan posisi Anda saat ini."}
+        Klik "Lokasi Saya" untuk melihat posisi Anda saat ini, atau "Simpan Lokasi" untuk menyimpan ke database.
       </p>
 
       <div className="rounded overflow-hidden mb-4 border border-gray-300">

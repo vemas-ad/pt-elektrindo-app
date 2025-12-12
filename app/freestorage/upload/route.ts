@@ -2,28 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// FALLBACK VALUES untuk menghindari error build
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://default-dummy.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-service-role-key';
-
-// Create Supabase client dengan fallback
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Create Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for server-side
+);
 
 export async function POST(request: NextRequest) {
   try {
-    // CEK jika env variables tidak ada (build time)
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.warn('⚠️ Supabase environment variables not configured');
-      
-      // Return graceful response untuk build time
-      return NextResponse.json({
-        success: false,
-        error: 'Storage service is temporarily unavailable',
-        fallback: true,
-        message: 'Please configure Supabase environment variables'
-      }, { status: 503 });
-    }
-
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const projectId = formData.get('projectId') as string;
@@ -140,15 +126,6 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // CEK jika env variables tidak ada
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({
-        success: false,
-        error: 'Storage service unavailable',
-        fallback: true
-      }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const fileUrl = searchParams.get('fileUrl');
     const projectId = searchParams.get('projectId');
