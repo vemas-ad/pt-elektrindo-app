@@ -1,4 +1,4 @@
-// app/projects/[projectId]/silver/loading.tsx
+﻿// app/projects/[projectId]/silver/loading.tsx
 export default function SilverLoading() {
   return (
     <div className="flex items-center justify-center min-h-screen">

@@ -1,4 +1,4 @@
-// app/dashboard/master/page.tsx
+﻿// app/dashboard/master/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -290,7 +290,7 @@ export default function MasterDashboard(): React.JSX.Element {
                   <div>
                     <div className="font-medium">{t.description}</div>
                     <div className="text-sm text-gray-600">
-                      Progress: {t.actual_progress ?? 0}% — Target: {t.plan_progress ?? 0}% — Status: {t.status || "N/A"}
+                      Progress: {t.actual_progress ?? 0}% â€” Target: {t.plan_progress ?? 0}% â€” Status: {t.status || "N/A"}
                     </div>
                   </div>
                   <div className="text-sm text-gray-500">
@@ -305,3 +305,4 @@ export default function MasterDashboard(): React.JSX.Element {
     </div>
   );
 }
+

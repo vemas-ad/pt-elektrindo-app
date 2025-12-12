@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
@@ -87,7 +87,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   if (!deadline || isNaN(new Date(deadline).getTime())) {
     return (
       <div className="flex items-center gap-1 text-gray-500 text-sm">
-        <span>📅</span>
+        <span>ðŸ“…</span>
         <span>Deadline tidak valid</span>
       </div>
     );
@@ -96,7 +96,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   if (timeLeft.isOverdue) {
     return (
       <div className="flex items-center gap-1 text-red-600 font-semibold text-sm">
-        <span>⏰</span>
+        <span>â°</span>
         <span>TELAT</span>
       </div>
     );
@@ -105,7 +105,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   if (timeLeft.days > 30) {
     return (
       <div className="flex items-center gap-1 text-green-600 text-sm">
-        <span>📅</span>
+        <span>ðŸ“…</span>
         <span>{timeLeft.days} hari</span>
       </div>
     );
@@ -114,7 +114,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   if (timeLeft.days > 7) {
     return (
       <div className="flex items-center gap-1 text-orange-500 text-sm">
-        <span>⏳</span>
+        <span>â³</span>
         <span>{timeLeft.days} hari</span>
       </div>
     );
@@ -123,7 +123,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   if (timeLeft.days > 0) {
     return (
       <div className="flex items-center gap-1 text-red-500 font-semibold text-sm">
-        <span>🚨</span>
+        <span>ðŸš¨</span>
         <span>{timeLeft.days}d {timeLeft.hours}h</span>
       </div>
     );
@@ -132,7 +132,7 @@ const CountdownTimer = ({ deadline }: { deadline: string }) => {
   // PERBAIKAN: Format waktu yang benar untuk jam dan menit
   return (
     <div className="flex items-center gap-1 text-red-600 font-bold text-sm">
-      <span>🔥</span>
+      <span>ðŸ”¥</span>
       <span>{timeLeft.hours}j {timeLeft.minutes}m {timeLeft.seconds}d</span>
     </div>
   );
@@ -195,7 +195,7 @@ export default function ProjectsPage(): React.ReactElement {
     setMounted(true);
   }, []);
 
-  // 🧠 Ambil role user aktif dan email
+  // ðŸ§  Ambil role user aktif dan email
   useEffect(() => {
     async function fetchUserData() {
       const {
@@ -233,7 +233,7 @@ export default function ProjectsPage(): React.ReactElement {
     fetchUserData();
   }, [router]);
 
-  // 🔁 Ambil daftar proyek realtime
+  // ðŸ” Ambil daftar proyek realtime
   useEffect(() => {
     fetchProjects();
 
@@ -284,7 +284,7 @@ export default function ProjectsPage(): React.ReactElement {
     initProjectCode();
   }, []);
 
-  // 📦 Ambil data project dari DB
+  // ðŸ“¦ Ambil data project dari DB
   async function fetchProjects() {
     setLoading(true);
     try {
@@ -307,7 +307,7 @@ export default function ProjectsPage(): React.ReactElement {
     }
   }
 
-  // ➕ Tambah project baru dengan template terstruktur - DIPERBAIKI
+  // âž• Tambah project baru dengan template terstruktur - DIPERBAIKI
   async function addProject() {
     if (!metaProject.job_name?.trim()) {
       alert("Job Name harus diisi!");
@@ -393,7 +393,7 @@ export default function ProjectsPage(): React.ReactElement {
         deadline: ""
       });
       fetchProjects();
-      alert("✅ Proyek berhasil ditambahkan!");
+      alert("âœ… Proyek berhasil ditambahkan!");
     } catch (err: any) {
       console.error(err);
       alert("Terjadi kesalahan: " + err.message);
@@ -402,7 +402,7 @@ export default function ProjectsPage(): React.ReactElement {
     }
   }
 
-  // ❌ Hapus project
+  // âŒ Hapus project
   async function deleteProject(id: number) {
     if (!confirm("Hapus project ini?")) return;
     setLoading(true);
@@ -422,7 +422,7 @@ export default function ProjectsPage(): React.ReactElement {
     }
   }
 
-  // 🚀 Buka dashboard sesuai role
+  // ðŸš€ Buka dashboard sesuai role
   const openProject = (id: number) => {
     localStorage.setItem("selectedProject", String(id));
     if (role === "master") {
@@ -583,7 +583,7 @@ export default function ProjectsPage(): React.ReactElement {
 
         <div className="mt-4 p-3 bg-blue-50 rounded border">
           <p className="text-sm text-blue-700">
-            💡 <strong>Kode proyek otomatis:</strong> P-EUI-NoUrut-Tanggal. Isi Job Name dan Deadline (wajib) lalu klik "Tambah Proyek".
+            ðŸ’¡ <strong>Kode proyek otomatis:</strong> P-EUI-NoUrut-Tanggal. Isi Job Name dan Deadline (wajib) lalu klik "Tambah Proyek".
           </p>
         </div>
 
@@ -593,7 +593,7 @@ export default function ProjectsPage(): React.ReactElement {
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
             disabled={loading || !metaProject.job_name?.trim() || !metaProject.deadline}
           >
-            {loading ? "⏳ Menambahkan..." : "➕ Tambah Proyek"}
+            {loading ? "â³ Menambahkan..." : "âž• Tambah Proyek"}
           </button>
         </div>
       </div>
@@ -605,7 +605,7 @@ export default function ProjectsPage(): React.ReactElement {
         </div>
       ) : projects.length === 0 ? (
         <div className="text-center py-8 text-gray-500 italic">
-          <div className="text-4xl mb-2">📋</div>
+          <div className="text-4xl mb-2">ðŸ“‹</div>
           <p>Belum ada proyek. Tambahkan proyek baru di atas.</p>
         </div>
       ) : (
@@ -638,9 +638,9 @@ export default function ProjectsPage(): React.ReactElement {
                     )}
                     
                     <div className="text-xs text-gray-500 space-y-1">
-                      {p.meta?.client && <div>👤 Client: {p.meta.client}</div>}
-                      {p.meta?.address && <div>📍 {p.meta.address}</div>}
-                      {p.meta?.time_schedule && <div>📅 Jadwal: {p.meta.time_schedule}</div>}
+                      {p.meta?.client && <div>ðŸ‘¤ Client: {p.meta.client}</div>}
+                      {p.meta?.address && <div>ðŸ“ {p.meta.address}</div>}
+                      {p.meta?.time_schedule && <div>ðŸ“… Jadwal: {p.meta.time_schedule}</div>}
                       {p.meta?.created_by && (
                         <div className="text-xs text-gray-400 mt-2">
                           Dibuat oleh: {p.meta.created_by}
@@ -650,7 +650,7 @@ export default function ProjectsPage(): React.ReactElement {
                       {/* Info Deadline */}
                       {projectDeadline && (
                         <div className="mt-2 p-2 bg-gray-50 rounded border">
-                          <div className="font-medium text-gray-700">⏰ Deadline</div>
+                          <div className="font-medium text-gray-700">â° Deadline</div>
                           <div className="text-gray-600">{formatDate(projectDeadline)}</div>
                         </div>
                       )}

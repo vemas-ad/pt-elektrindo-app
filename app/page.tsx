@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ Jika user sudah login, arahkan langsung ke /projects
+  // âœ… Jika user sudah login, arahkan langsung ke /projects
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -33,7 +33,7 @@ export default function LoginPage() {
         return;
       }
 
-      console.log("🔐 Attempting login with:", { email, password });
+      console.log("ðŸ” Attempting login with:", { email, password });
 
       // Tentukan role berdasarkan password
       let userRole = 'user';
@@ -55,7 +55,7 @@ export default function LoginPage() {
 
       // Jika login gagal karena user tidak ditemukan, coba daftarkan user baru
       if (signError && signError.message.includes('Invalid login credentials')) {
-        console.log("🆕 User tidak ditemukan, mencoba mendaftarkan user baru...");
+        console.log("ðŸ†• User tidak ditemukan, mencoba mendaftarkan user baru...");
         
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -68,13 +68,13 @@ export default function LoginPage() {
         });
 
         if (signUpError) {
-          console.error("❌ Sign up error:", signUpError);
+          console.error("âŒ Sign up error:", signUpError);
           alert("Pendaftaran user gagal: " + signUpError.message);
           setLoading(false);
           return;
         }
 
-        console.log("✅ User berhasil didaftarkan:", signUpData);
+        console.log("âœ… User berhasil didaftarkan:", signUpData);
         
         // Coba login lagi setelah pendaftaran berhasil
         const { data: retrySignData, error: retrySignError } = await supabase.auth.signInWithPassword({
@@ -83,40 +83,40 @@ export default function LoginPage() {
         });
 
         if (retrySignError) {
-          console.error("❌ Retry login error:", retrySignError);
+          console.error("âŒ Retry login error:", retrySignError);
           alert("Login gagal setelah pendaftaran: " + retrySignError.message);
           setLoading(false);
           return;
         }
 
-        console.log("✅ Login berhasil setelah pendaftaran:", retrySignData);
+        console.log("âœ… Login berhasil setelah pendaftaran:", retrySignData);
         
         // Simpan data ke localStorage
         localStorage.setItem("userEmail", email);
         localStorage.setItem("userRole", userRole);
         localStorage.setItem("userProfile", `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`);
 
-        alert("✅ Pendaftaran dan login berhasil! Mengarahkan ke halaman projects...");
+        alert("âœ… Pendaftaran dan login berhasil! Mengarahkan ke halaman projects...");
         router.push("/projects");
         return;
 
       } else if (signError) {
         // Error selain "Invalid login credentials"
-        console.error("❌ Login error:", signError);
+        console.error("âŒ Login error:", signError);
         alert("Login gagal: " + signError.message);
         setLoading(false);
         return;
       }
 
-      // ✅ Jika login berhasil tanpa error
-      console.log("✅ Login successful:", signData);
+      // âœ… Jika login berhasil tanpa error
+      console.log("âœ… Login successful:", signData);
 
-      // ✅ Simpan data user ke localStorage
+      // âœ… Simpan data user ke localStorage
       localStorage.setItem("userEmail", email);
       localStorage.setItem("userRole", userRole);
       localStorage.setItem("userProfile", `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`);
 
-      // ✅ Coba update tabel users (jika ada) - dengan error handling yang lebih baik
+      // âœ… Coba update tabel users (jika ada) - dengan error handling yang lebih baik
       try {
         // Cek dulu apakah tabel users ada dengan melakukan select
         const { data: testData, error: testError } = await supabase
@@ -125,7 +125,7 @@ export default function LoginPage() {
           .limit(1);
 
         if (testError) {
-          console.log("ℹ️ Tabel users tidak tersedia, skip update user data");
+          console.log("â„¹ï¸ Tabel users tidak tersedia, skip update user data");
         } else {
           // Jika tabel users ada, lakukan upsert
           const { error: upsertError } = await supabase
@@ -139,17 +139,17 @@ export default function LoginPage() {
             });
 
           if (upsertError && upsertError.code !== '42P01') { // 42P01 = table doesn't exist
-            console.warn("⚠️ Gagal update user data:", upsertError);
+            console.warn("âš ï¸ Gagal update user data:", upsertError);
           } else {
-            console.log("✅ User data updated successfully");
+            console.log("âœ… User data updated successfully");
           }
         }
       } catch (dbError) {
-        console.log("ℹ️ Error saat mengakses tabel users:", dbError);
+        console.log("â„¹ï¸ Error saat mengakses tabel users:", dbError);
         // Ignore error, lanjutkan proses login
       }
 
-      // ✅ Arahkan ke halaman pilihan proyek
+      // âœ… Arahkan ke halaman pilihan proyek
       alert("Login berhasil! Mengarahkan ke halaman projects...");
       router.push("/projects");
       
@@ -201,9 +201,9 @@ export default function LoginPage() {
         <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
           <p className="text-xs text-blue-700">
             <strong>Info Login:</strong><br/>
-            • Email: harus @gmail.com<br/>
-            • Silver: password <strong>Supervisor</strong><br/>
-            • Master: password <strong>Management</strong>
+            â€¢ Email: harus @gmail.com<br/>
+            â€¢ Silver: password <strong>Supervisor</strong><br/>
+            â€¢ Master: password <strong>Management</strong>
           </p>
         </div>
 
@@ -241,13 +241,14 @@ export default function LoginPage() {
 
         <div className="mt-4 p-3 bg-green-50 rounded border">
           <p className="text-xs text-green-700">
-            <strong>💡 Fitur Baru:</strong><br/>
-            • User akan otomatis didaftarkan jika belum ada<br/>
-            • Gunakan password sesuai role (Silver/Master)<br/>
-            • Data tersimpan aman di Supabase Auth
+            <strong>ðŸ’¡ Fitur Baru:</strong><br/>
+            â€¢ User akan otomatis didaftarkan jika belum ada<br/>
+            â€¢ Gunakan password sesuai role (Silver/Master)<br/>
+            â€¢ Data tersimpan aman di Supabase Auth
           </p>
         </div>
       </form>
     </div>
   );
 }
+

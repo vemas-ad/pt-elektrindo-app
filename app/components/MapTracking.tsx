@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -146,7 +146,7 @@ export default function MapTracking({ projectId, center, zoom = 11 }: Props) {
             updated_at: new Date().toISOString(),
           };
           
-          console.log("📤 Inserting location to database...");
+          console.log("ðŸ“¤ Inserting location to database...");
           
           // PERBAIKAN: Gunakan cara yang sangat aman untuk menghindari error object kosong
           const result = await supabase
@@ -156,7 +156,7 @@ export default function MapTracking({ projectId, center, zoom = 11 }: Props) {
           // PERBAIKAN KRITIS: Cek error dengan cara yang sangat aman
           if (result.error) {
             // Gunakan cara yang aman untuk menampilkan error
-            console.log("⚠️ Database insert warning (safe log):", 
+            console.log("âš ï¸ Database insert warning (safe log):", 
               result.error ? 
               `Code: ${result.error.code || 'NO_CODE'}, Message: ${result.error.message || 'NO_MESSAGE'}` : 
               'Unknown error'
@@ -164,19 +164,19 @@ export default function MapTracking({ projectId, center, zoom = 11 }: Props) {
             
             // Tidak perlu alert, data sudah tampil di peta
           } else {
-            console.log("✅ Insert berhasil");
+            console.log("âœ… Insert berhasil");
           }
           
         } catch (err: any) {
           // PERBAIKAN: Tangani error dengan cara yang sangat aman
-          console.log("⚠️ Database exception (safe):", 
+          console.log("âš ï¸ Database exception (safe):", 
             err && typeof err === 'object' ? 
             (err.message || String(err)) : 
             'Unknown exception'
           );
         }
         
-        alert("✅ Lokasi Anda berhasil ditambahkan ke peta!");
+        alert("âœ… Lokasi Anda berhasil ditambahkan ke peta!");
         
       },
       (err) => {

@@ -1,4 +1,4 @@
-// app/dashboard/silver/page.tsx
+﻿// app/dashboard/silver/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -95,7 +95,7 @@ export default function SilverDashboard() {
     }
   }
 
-  // saat user edit di grid → simpan ke supabase
+  // saat user edit di grid â†’ simpan ke supabase
   async function onRowsChange(newRows: any[], { indexes }: any) {
     setRows(newRows);
     const idx = indexes?.[0];
@@ -190,7 +190,7 @@ export default function SilverDashboard() {
     <div className="p-6 bg-gray-50 min-h-screen space-y-6">
       {/* header */}
       <header className="flex justify-between items-center bg-blue-800 text-white p-4 rounded-md shadow">
-        <h1 className="text-2xl font-bold">📘 Silver Dashboard — {projectName}</h1>
+        <h1 className="text-2xl font-bold">ðŸ“˜ Silver Dashboard â€” {projectName}</h1>
         <button
           onClick={async () => {
             await handleLogout();
@@ -221,7 +221,7 @@ export default function SilverDashboard() {
 
       {/* grid editable (excel-like) */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">📋 Master Schedule — Editable (Silver)</h2>
+        <h2 className="font-semibold mb-2">ðŸ“‹ Master Schedule â€” Editable (Silver)</h2>
         <div style={{ height: 420 }}>
           <DataGrid
             columns={columns}
@@ -234,7 +234,7 @@ export default function SilverDashboard() {
 
       {/* kurva s */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">📈 Kurva S (Auto Update)</h2>
+        <h2 className="font-semibold mb-2">ðŸ“ˆ Kurva S (Auto Update)</h2>
         <div style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -252,7 +252,7 @@ export default function SilverDashboard() {
 
       {/* map */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">🗺️ Lokasi Progress / Pengiriman</h2>
+        <h2 className="font-semibold mb-2">ðŸ—ºï¸ Lokasi Progress / Pengiriman</h2>
         <MapTracking center={mapCenter} />
       </div>
 
@@ -277,3 +277,4 @@ export default function SilverDashboard() {
     </div>
   );
 }
+
