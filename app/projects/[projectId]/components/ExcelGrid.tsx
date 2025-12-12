@@ -1,7 +1,7 @@
 // app/projects/[projectId]/components/ExcelGrid.tsx - VERSI FINAL
 "use client";
 import React, { useEffect, useState } from "react";
-import { DataGrid, Column, RenderCellProps } from "react-data-grid";
+import DataGrid, { Column, RenderCellProps } from "react-data-grid";
 import { supabase } from "../../../../lib/supabaseClient";
 
 // Definisi tipe data tiap baris

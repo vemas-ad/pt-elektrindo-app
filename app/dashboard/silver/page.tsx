@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 // react-data-grid menggunakan named export DataGrid
-import { DataGrid } from "react-data-grid";
+import DataGrid from "react-data-grid";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";

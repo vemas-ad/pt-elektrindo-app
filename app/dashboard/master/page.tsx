@@ -49,7 +49,8 @@ type ProjectType = {
   created_at?: string | null;
 };
 
-export default function MasterDashboard(): JSX.Element {
+export default function MasterDashboard(): React.JSX.Element {
+  
   const router = useRouter();
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [shipments, setShipments] = useState<ShipmentType[]>([]);

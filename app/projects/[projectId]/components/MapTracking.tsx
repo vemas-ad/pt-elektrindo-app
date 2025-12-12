@@ -7,22 +7,22 @@ import L from "leaflet";
 import { supabase } from "../../../../lib/supabaseClient";
 
 // Dynamically import Leaflet components
-const MapContainer = dynamic(
+const MapContainer = dynamic<React.ComponentProps<typeof import("react-leaflet").MapContainer>>(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
 );
 
-const TileLayer = dynamic(
+const TileLayer = dynamic<React.ComponentProps<typeof import("react-leaflet").TileLayer>>(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
 
-const Marker = dynamic(
+const Marker = dynamic<React.ComponentProps<typeof import("react-leaflet").Marker>>(
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
 
-const Popup = dynamic(
+const Popup = dynamic<React.ComponentProps<typeof import("react-leaflet").Popup>>(
   () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );

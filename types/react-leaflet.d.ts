@@ -3,5 +3,5 @@ declare module "react-leaflet" {
   export const TileLayer: any;
   export const Marker: any;
   export const Popup: any;
-  export const useMap: any; // FIX ERROR useMap
+  export const useMap: any; // FIX utama
 }

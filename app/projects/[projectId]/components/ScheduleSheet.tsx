@@ -110,9 +110,9 @@ export default function ScheduleSheet({
       const copy = [...prev];
       const r = { ...(copy[index] || {}) };
       if (key === "weight" || key === "plan_progress" || key === "actual_progress") {
-        r[key] = value === "" ? 0 : Number(value);
+(r as any)[key] = value === "" ? 0 : Number(value);
       } else {
-        r[key] = value;
+(r as any)[key] = value;
       }
       copy[index] = r;
       // save debounce quickly
