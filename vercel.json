@@ -1,4 +1,0 @@
-{
-  "installCommand": "npm install --legacy-peer-deps --prefer-dedupe",
-  "buildCommand": "npm install --legacy-peer-deps --prefer-dedupe && npm run build"
-}
