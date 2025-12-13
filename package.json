@@ -4,13 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-"build": "next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-      "@types/react": "^18.3.27",
-  "@types/react-dom": "^18.3.7",
     "@google-cloud/storage": "^7.17.3",
     "@react-google-maps/api": "^2.20.7",
     "@react-leaflet/core": "1.1.0",
@@ -55,6 +53,8 @@
     "@types/jquery": "^3.5.33",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^8.57.0",
     "eslint-config-next": "^16.0.10"
   }
