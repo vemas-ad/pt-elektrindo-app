@@ -35,8 +35,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Create primary client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { persistSession: true }
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
 });
+
 
 if (typeof window !== 'undefined') {
   console.log("✅ PRIMARY Supabase client initialized");
@@ -53,9 +58,14 @@ const hasValidSecondaryConfig = supabaseUrl2 && supabaseAnonKey2 &&
 
 if (hasValidSecondaryConfig) {
   try {
-    supabase2 = createClient(supabaseUrl2, supabaseAnonKey2, {
-      auth: { persistSession: true }
-    });
+supabase2 = createClient(supabaseUrl2, supabaseAnonKey2, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
+
     secondaryEnabled = true;
     
     if (typeof window !== 'undefined') {
