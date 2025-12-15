@@ -1,15 +1,26 @@
 // app/api/upload-supabase/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-// Buat Supabase client dengan Service Role key untuk server-side
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// 🔹 Gunakan fungsi untuk membuat client Supabase di server
+function getServerSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Supabase server environment variables are missing");
+  }
+
+  return createClient(url, key);
+}
+
+// ❌ Hapus inisialisasi supabase di luar fungsi
+// const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServerSupabase();
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const projectId = (formData.get('projectId') as string) || '';
@@ -25,7 +36,6 @@ export async function POST(request: NextRequest) {
 
     console.log('📁 Processing file for Supabase Storage:', file.name);
 
-    // Validasi file size
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
         { success: false, error: 'File terlalu besar. Maksimal 10MB.' },
@@ -49,7 +59,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate nama file unik
     const fileExtension = file.name.split('.').pop() ?? 'dat';
     const timestamp = Date.now();
     const safeDescription = description.replace(/[^a-zA-Z0-9]/g, '_');
@@ -57,11 +66,9 @@ export async function POST(request: NextRequest) {
 
     console.log('📤 Uploading to Supabase Storage:', fileName);
 
-    // Convert file ke Uint8Array
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    // Upload ke Supabase Storage
     const { data, error } = await supabase.storage
       .from('proofs')
       .upload(fileName, uint8Array, {
@@ -78,14 +85,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ambil public URL
     const { data: urlData } = supabase.storage
       .from('proofs')
       .getPublicUrl(fileName);
 
     const publicUrl = urlData?.publicUrl || '';
 
-    // Simpan URL ke DB jika ada taskId
     if (taskId) {
       const { error: updateError } = await supabase
         .from('tasks')
@@ -119,6 +124,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getServerSupabase(); // ✅ pastikan Supabase client dipanggil di setiap request
+
     const { searchParams } = new URL(request.url);
     const fileUrl = searchParams.get('fileUrl');
     const projectId = searchParams.get('projectId');
@@ -130,7 +137,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Ambil file path dari URL
     const fileName = fileUrl.split('/').slice(-1)[0];
     const filePath = `${projectId}/${fileName}`;
 
