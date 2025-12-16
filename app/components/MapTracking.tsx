@@ -149,9 +149,10 @@ export default function MapTracking({ projectId, center, zoom = 11 }: Props) {
           console.log("ðŸ“¤ Inserting location to database...");
           
           // PERBAIKAN: Gunakan cara yang sangat aman untuk menghindari error object kosong
-          const result = await supabase
-            .from("shipments")
-            .insert([insertData]);
+const result = await supabase
+  .from("shipments")
+  .insert(insertData as any);
+
           
           // PERBAIKAN KRITIS: Cek error dengan cara yang sangat aman
           if (result.error) {

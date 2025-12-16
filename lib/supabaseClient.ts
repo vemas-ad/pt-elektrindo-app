@@ -7,132 +7,76 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL_2;
-const supabaseAnonKey2 = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_2;
-
 const primaryStorageUrl = process.env.NEXT_PUBLIC_PRIMARY_STORAGE_URL!;
-const secondaryStorageUrl = process.env.NEXT_PUBLIC_SECONDARY_STORAGE_URL;
 
 /* ==============================================================
-   SINGLETON SAFE CLIENT (ANTI DOUBLE INIT – TURBOPACK SAFE)
+   DATABASE TYPES
+================================================================ */
+
+// Tipe sederhana untuk master_schedule
+export interface MasterSchedule {
+  id: number;
+  description: string | null;
+  week_date: string | null;
+  weight: number | null;
+  plan_progress: number | null;
+  actual_progress: number | null;
+  color: string | null;
+  created_at: string;
+  updated_at: string | null;
+  project_name?: string | null;
+}
+
+export type MasterScheduleUpdate = Partial<MasterSchedule>;
+
+// HAPUS deklarasi kedua MasterScheduleUpdate di bawah ini
+// export interface MasterScheduleUpdate {  // <-- HAPUS INI
+//   description?: string | null;
+//   week_date?: string | null;
+//   weight?: number | null;
+//   plan_progress?: number | null;
+//   actual_progress?: number | null;
+//   color?: string | null;
+//   updated_at?: string;
+// }
+
+/* ==============================================================
+   SINGLETON SAFE CLIENT
 ================================================================ */
 
 declare global {
-  // eslint-disable-next-line no-var
   var _supabasePrimary: ReturnType<typeof createClient> | undefined;
-  // eslint-disable-next-line no-var
-  var _supabaseSecondary: ReturnType<typeof createClient> | null | undefined;
 }
 
-export const supabase =
-  globalThis._supabasePrimary ??
-  (globalThis._supabasePrimary = createClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    }
-  ));
-
-export let supabase2: ReturnType<typeof createClient> | null =
-  globalThis._supabaseSecondary ?? null;
-
-let secondaryEnabled = false;
-
-/* ==============================================================
-   SECONDARY INIT (OPTIONAL, SAFE)
-================================================================ */
-
-const hasValidSecondaryConfig =
-  !!supabaseUrl2 &&
-  !!supabaseAnonKey2 &&
-  supabaseUrl2.startsWith("http") &&
-  supabaseAnonKey2.startsWith("ey");
-
-if (hasValidSecondaryConfig) {
-  try {
-    supabase2 =
-      globalThis._supabaseSecondary ??
-      (globalThis._supabaseSecondary = createClient(
-        supabaseUrl2,
-        supabaseAnonKey2,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
-        }
-      ));
-
-    secondaryEnabled = true;
-  } catch {
-    supabase2 = null;
-    secondaryEnabled = false;
+// Buat client tanpa generic type
+const supabaseClient = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   }
-} else {
-  supabase2 = null;
-  secondaryEnabled = false;
-}
+);
+
+// Export supabase dengan type assertion
+export const supabase = supabaseClient as any;
 
 /* ==============================================================
    ⛔ JANGAN UBAH APA PUN DI BAWAH INI
-   (DualStorage, interface, logic 921 line kamu)
+   (Storage management functions dan interface)
 ================================================================ */
 
-
-// PERBAIKAN: Test connection ke secondary storage - HANYA di client side dengan error handling yang lebih baik
-async function testSecondaryConnection() {
-  // Pastikan hanya dijalankan di client side dan secondary tersedia
-  if (typeof window === 'undefined' || !supabase2 || !secondaryEnabled) {
-    return;
-  }
-  
-  try {
-    // Timeout untuk menghindari request yang terlalu lama
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    const { data, error } = await supabase2
-      .storage
-      .from('proofs')
-      .list('', { limit: 1 });
-
-    clearTimeout(timeoutId);
-
-    if (error) {
-      // Jangan log error jika hanya karena network issue atau CORS
-      if (!error.message.includes('Failed to fetch') && !error.message.includes('CORS')) {
-        console.error("❌ Secondary storage connection test FAILED:", error.message);
-      }
-    } else {
-      console.log("✅ Secondary storage connection test SUCCESS");
-    }
-  } catch (error: any) {
-    // Jangan log error untuk network issues umum
-    if (error.name !== 'AbortError' && !error.message.includes('Failed to fetch')) {
-      console.error("❌ Secondary storage connection test ERROR:", error.message);
-    }
-  }
-}
-
-if (typeof window !== 'undefined') {
-  console.log("📊 FINAL STATUS - Secondary storage:", secondaryEnabled ? "ENABLED" : "DISABLED");
-}
-
 // ==============================================================
-// 🗂️ TYPE DEFINITIONS
+// 🗂️ STORAGE TYPE DEFINITIONS
 // ==============================================================
 
 export interface UploadResult {
   success: boolean;
   url: string | null;
   primary: { success: boolean; error?: string; data?: any };
-  secondary: { success: boolean; error?: string; data?: any };
   errors: string[];
   warnings: string[];
   debug?: any;
@@ -141,7 +85,7 @@ export interface UploadResult {
 export interface DownloadResult {
   success: boolean;
   url?: string;
-  source?: 'primary' | 'secondary' | 'none';
+  source?: 'primary' | 'none';
   error?: string;
 }
 
@@ -149,7 +93,6 @@ export interface ListFilesResult {
   success: boolean;
   files: any[];
   primaryCount: number;
-  secondaryCount: number;
   errors: string[];
   warnings: string[];
 }
@@ -157,7 +100,6 @@ export interface ListFilesResult {
 export interface DeleteResult {
   success: boolean;
   primary: boolean;
-  secondary: boolean;
   errors: string[];
   warnings: string[];
 }
@@ -170,16 +112,15 @@ export interface HealthStatus {
 
 export interface HealthCheckResult {
   primary: HealthStatus;
-  secondary: HealthStatus;
 }
 
 // ==============================================================
-// 🗂️ DUAL STORAGE MANAGEMENT CLASS
+// 🗂️ STORAGE MANAGEMENT CLASS
 // ==============================================================
 
-export class DualStorage {
+export class StorageManager {
   /**
-   * Upload file ke kedua storage dengan strategy yang lebih robust
+   * Upload file ke storage dengan strategy yang robust
    */
   static async upload(file: File, filePath: string, bucketName: string = 'proofs'): Promise<UploadResult> {
     if (typeof window === 'undefined') {
@@ -187,62 +128,38 @@ export class DualStorage {
         success: false,
         url: null,
         primary: { success: false },
-        secondary: { success: false },
         errors: ['Cannot upload on server side'],
         warnings: []
       };
     }
 
-    console.log(`📤 ========== DUAL UPLOAD START ==========`);
+    console.log(`📤 ========== UPLOAD START ==========`);
     console.log(`📤 File: ${filePath} (${file.size} bytes)`);
 
     const results: UploadResult = {
       success: false,
       url: null,
       primary: { success: false },
-      secondary: { success: false },
       errors: [],
       warnings: [],
       debug: {
         timestamp: new Date().toISOString(),
         fileInfo: { name: file.name, size: file.size, type: file.type, path: filePath },
-        primary: {} as any,
-        secondary: {} as any
+        primary: {} as any
       }
     };
 
     try {
-      // STEP 1: Upload ke PRIMARY storage (AKUN 1)
+      // STEP 1: Upload ke PRIMARY storage
       console.log('🔄 STEP 1: Uploading to PRIMARY storage...');
       
-      // PERBAIKAN: Panggil fungsi dengan parameter yang benar
-      const primaryResult = await this.uploadToSingleStorage(supabase, file, filePath, bucketName, 'primary');
+      const primaryResult = await this.uploadToStorage(supabase, file, filePath, bucketName, 'primary');
       results.primary = primaryResult;
       results.debug.primary = primaryResult;
 
-      // STEP 2: Upload ke SECONDARY storage (AKUN 2) - jika available
-      if (supabase2 && secondaryEnabled) {
-        console.log('🔄 STEP 2: Uploading to SECONDARY storage...');
-        
-        // PERBAIKAN: Panggil fungsi dengan parameter yang benar
-        const secondaryResult = await this.uploadToSingleStorage(supabase2, file, filePath, bucketName, 'secondary');
-        results.secondary = secondaryResult;
-        results.debug.secondary = secondaryResult;
-        
-        if (!secondaryResult.success) {
-          results.warnings.push(`SECONDARY: ${secondaryResult.error}`);
-        }
-      } else {
-        results.warnings.push('SECONDARY: Client not available');
-        console.warn('⚠️ Secondary client not available, skipping secondary upload');
-      }
-
-      // Tentukan final URL (prioritize primary)
+      // Tentukan final URL
       if (results.primary.success) {
         results.url = `${primaryStorageUrl}/${filePath}`;
-        results.success = true;
-      } else if (results.secondary.success) {
-        results.url = `${secondaryStorageUrl}/${filePath}`;
         results.success = true;
       }
 
@@ -250,7 +167,6 @@ export class DualStorage {
       console.log('🎉 UPLOAD RESULTS:', {
         success: results.success,
         primary: results.primary.success,
-        secondary: results.secondary.success,
         url: results.url,
         errors: results.errors.length,
         warnings: results.warnings.length
@@ -266,14 +182,14 @@ export class DualStorage {
   }
 
   /**
-   * Helper function untuk upload ke single storage - PERBAIKAN: nama dan parameter diperbaiki
+   * Helper function untuk upload ke storage
    */
-  static async uploadToSingleStorage(
+  static async uploadToStorage(
     client: any,
     file: File, 
     fileName: string, 
     bucket: string = 'proofs', 
-    storageType: 'primary' | 'secondary' = 'primary'
+    storageType: 'primary' = 'primary'
   ): Promise<{ success: boolean; url?: string; error?: string }> {
     
     const startTime = Date.now();
@@ -300,7 +216,6 @@ export class DualStorage {
       const uploadTime = Date.now() - startTime;
 
       if (error) {
-        // PERBAIKAN: Gunakan console.log daripada console.error untuk menghindari error di console
         console.log(`❌ ${storageType} Upload FAILED (${uploadTime}ms):`, error.message);
         return { 
           success: false, 
@@ -322,7 +237,6 @@ export class DualStorage {
 
     } catch (error: any) {
       const uploadTime = Date.now() - startTime;
-      // PERBAIKAN: Gunakan console.log daripada console.error
       console.log(`❌ ${storageType} Upload EXCEPTION (${uploadTime}ms):`, error.message);
       return {
         success: false,
@@ -332,7 +246,7 @@ export class DualStorage {
   }
 
   /**
-   * Download file (coba primary dulu, lalu secondary sebagai fallback)
+   * Download file dari storage
    */
   static async download(filePath: string, bucketName: string = 'proofs'): Promise<DownloadResult> {
     if (typeof window === 'undefined') {
@@ -343,10 +257,10 @@ export class DualStorage {
       };
     }
 
-    console.log(`📥 Downloading from dual storage: ${filePath}`);
+    console.log(`📥 Downloading from storage: ${filePath}`);
     
     try {
-      // Try PRIMARY first
+      // Try PRIMARY
       const { data: primaryData, error: primaryError } = await supabase
         .storage
         .from(bucketName)
@@ -361,29 +275,10 @@ export class DualStorage {
         };
       }
 
-      console.warn('⚠️ Primary storage not available, trying secondary...');
-
-      // Fallback to SECONDARY
-      if (supabase2) {
-        const { data: secondaryData, error: secondaryError } = await supabase2
-          .storage
-          .from(bucketName)
-          .createSignedUrl(filePath, 3600);
-
-        if (!secondaryError && secondaryData) {
-          console.log('✅ File found in SECONDARY storage');
-          return { 
-            success: true,
-            url: secondaryData.signedUrl, 
-            source: 'secondary'
-          };
-        }
-      }
-
-      throw new Error('File not found in both storage systems');
+      throw new Error('File not found in storage system');
 
     } catch (error: any) {
-      console.error('❌ Dual storage download error:', error);
+      console.error('❌ Storage download error:', error);
       return { 
         success: false, 
         error: error.message,
@@ -395,18 +290,12 @@ export class DualStorage {
   /**
    * Get public URL untuk images (tanpa signed URL)
    */
-  static getPublicUrl(filePath: string, preferredSource: 'primary' | 'secondary' = 'primary'): string {
-    if (preferredSource === 'primary') {
-      return `${primaryStorageUrl}/${filePath}`;
-    } else if (preferredSource === 'secondary' && secondaryStorageUrl) {
-      return `${secondaryStorageUrl}/${filePath}`;
-    } else {
-      return `${primaryStorageUrl}/${filePath}`;
-    }
+  static getPublicUrl(filePath: string, preferredSource: 'primary' = 'primary'): string {
+    return `${primaryStorageUrl}/${filePath}`;
   }
 
   /**
-   * List files dari kedua storage
+   * List files dari storage
    */
   static async listFiles(folderPath: string = '', bucketName: string = 'proofs', limit: number = 100): Promise<ListFilesResult> {
     if (typeof window === 'undefined') {
@@ -414,29 +303,19 @@ export class DualStorage {
         success: false,
         files: [],
         primaryCount: 0,
-        secondaryCount: 0,
         errors: ['Cannot list files on server side'],
         warnings: []
       };
     }
 
-    console.log(`📂 Listing files from dual storage: ${folderPath}`);
+    console.log(`📂 Listing files from storage: ${folderPath}`);
     
     try {
-      const [primaryList, secondaryList] = await Promise.all([
-        // Primary storage
-        supabase.storage.from(bucketName).list(folderPath, {
-          limit,
-          offset: 0,
-          sortBy: { column: 'name', order: 'asc' }
-        }),
-        // Secondary storage (jika available)
-        supabase2 ? supabase2.storage.from(bucketName).list(folderPath, {
-          limit,
-          offset: 0,
-          sortBy: { column: 'name', order: 'asc' }
-        }) : { data: null, error: new Error('Secondary storage disabled') }
-      ]);
+      const primaryList = await supabase.storage.from(bucketName).list(folderPath, {
+        limit,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' }
+      });
 
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -445,32 +324,25 @@ export class DualStorage {
         errors.push(`PRIMARY: ${primaryList.error.message}`);
       }
 
-      if (secondaryList.error && supabase2) {
-        warnings.push(`SECONDARY: ${secondaryList.error.message}`);
-      }
-
-      // Merge file lists (prioritize primary, remove duplicates)
+      // File lists
       const primaryFiles = primaryList.data || [];
-      const secondaryFiles = (secondaryList as any).data || [];
       
-      const mergedFiles = primaryFiles.length > 0 ? primaryFiles : secondaryFiles;
+      const mergedFiles = primaryFiles;
 
       return {
         success: mergedFiles.length > 0,
         files: mergedFiles,
         primaryCount: primaryFiles.length,
-        secondaryCount: secondaryFiles.length,
         errors,
         warnings
       };
 
     } catch (error: any) {
-      console.error('❌ Dual storage list error:', error);
+      console.error('❌ Storage list error:', error);
       return {
         success: false,
         files: [],
         primaryCount: 0,
-        secondaryCount: 0,
         errors: [`System error: ${error.message}`],
         warnings: []
       };
@@ -478,25 +350,23 @@ export class DualStorage {
   }
 
   /**
-   * Delete file dari kedua storage
+   * Delete file dari storage
    */
   static async delete(filePath: string, bucketName: string = 'proofs'): Promise<DeleteResult> {
     if (typeof window === 'undefined') {
       return {
         success: false,
         primary: false,
-        secondary: false,
         errors: ['Cannot delete on server side'],
         warnings: []
       };
     }
 
-    console.log(`🗑️ Deleting from dual storage: ${filePath}`);
+    console.log(`🗑️ Deleting from storage: ${filePath}`);
     
     const results: DeleteResult = {
       success: false,
       primary: false,
-      secondary: false,
       errors: [],
       warnings: []
     };
@@ -515,32 +385,14 @@ export class DualStorage {
         console.log('✅ Primary delete success');
       }
 
-      // Delete from SECONDARY - PERBAIKAN: Cek null dulu
-      if (supabase2) {
-        const { error: secondaryError } = await supabase2
-          .storage
-          .from(bucketName)
-          .remove([filePath]);
-
-        if (secondaryError) {
-          results.errors.push(`SECONDARY: ${secondaryError.message}`);
-        } else {
-          results.secondary = true;
-          console.log('✅ Secondary delete success');
-        }
-      } else {
-        results.warnings.push('Secondary storage disabled - skip delete');
-      }
-
-      results.success = results.primary || results.secondary;
+      results.success = results.primary;
       return results;
 
     } catch (error: any) {
-      console.error('❌ Dual storage delete error:', error);
+      console.error('❌ Storage delete error:', error);
       return {
         success: false,
         primary: false,
-        secondary: false,
         errors: [`System error: ${error.message}`],
         warnings: []
       };
@@ -548,21 +400,19 @@ export class DualStorage {
   }
 
   /**
-   * Check health status kedua storage
+   * Check health status storage
    */
   static async healthCheck(bucketName: string = 'proofs'): Promise<HealthCheckResult> {
     if (typeof window === 'undefined') {
       return {
-        primary: { status: 'unknown', responseTime: 0 },
-        secondary: { status: 'unknown', responseTime: 0 }
+        primary: { status: 'unknown', responseTime: 0 }
       };
     }
 
-    console.log('🏥 Running dual storage health check...');
+    console.log('🏥 Running storage health check...');
     
     const health: HealthCheckResult = {
-      primary: { status: 'unknown', responseTime: 0 },
-      secondary: { status: 'unknown', responseTime: 0 }
+      primary: { status: 'unknown', responseTime: 0 }
     };
 
     try {
@@ -580,28 +430,6 @@ export class DualStorage {
         ...(primaryError && { error: primaryError.message })
       };
 
-      // Test SECONDARY - PERBAIKAN: Cek null dulu
-      if (supabase2 && secondaryEnabled) {
-        const secondaryStart = performance.now();
-        const { error: secondaryError } = await supabase2
-          .storage
-          .from(bucketName)
-          .list('', { limit: 1 });
-        const secondaryEnd = performance.now();
-
-        health.secondary = {
-          status: secondaryError ? 'error' : 'healthy',
-          responseTime: Math.round(secondaryEnd - secondaryStart),
-          ...(secondaryError && { error: secondaryError.message })
-        };
-      } else {
-        health.secondary = {
-          status: 'disabled',
-          responseTime: 0,
-          error: 'Secondary client not initialized'
-        };
-      }
-
       console.log('🏥 Health check completed:', health);
       return health;
 
@@ -609,16 +437,14 @@ export class DualStorage {
       console.error('❌ Health check error:', error);
       health.primary.status = 'error';
       health.primary.error = error.message;
-      health.secondary.status = 'error';
-      health.secondary.error = error.message;
       return health;
     }
   }
 
   /**
-   * Manual upload hanya ke secondary (untuk debugging)
+   * Manual upload untuk debugging
    */
-  static async uploadToSecondaryOnly(file: File, filePath: string, bucketName: string = 'proofs'): Promise<{
+  static async manualUpload(file: File, filePath: string, bucketName: string = 'proofs'): Promise<{
     success: boolean;
     error?: string;
     data?: any;
@@ -631,30 +457,18 @@ export class DualStorage {
       };
     }
 
-    if (!supabase2 || !secondaryEnabled) {
-      return { 
-        success: false, 
-        error: 'Secondary client not available',
-        debug: {
-          supabaseUrl2: !!supabaseUrl2,
-          supabaseAnonKey2: !!supabaseAnonKey2,
-          secondaryEnabled
-        }
-      };
-    }
-
-    console.log(`🔧 MANUAL UPLOAD TO SECONDARY ONLY: ${filePath}`);
+    console.log(`🔧 MANUAL UPLOAD: ${filePath}`);
     
     try {
       // Test connection dulu
-      console.log('🔍 Testing secondary connection...');
-      const { data: testData, error: testError } = await supabase2
+      console.log('🔍 Testing storage connection...');
+      const { data: testData, error: testError } = await supabase
         .storage
         .from(bucketName)
         .list('', { limit: 1 });
 
       if (testError) {
-        console.error('❌ Secondary connection test failed:', testError);
+        console.error('❌ Storage connection test failed:', testError);
         return { 
           success: false, 
           error: `Connection test failed: ${testError.message}`,
@@ -662,11 +476,11 @@ export class DualStorage {
         };
       }
 
-      console.log('✅ Secondary connection test passed');
+      console.log('✅ Storage connection test passed');
 
       // Upload file
-      console.log('🔄 Uploading file to secondary...');
-      const { data, error } = await supabase2
+      console.log('🔄 Uploading file...');
+      const { data, error } = await supabase
         .storage
         .from(bucketName)
         .upload(filePath, file, {
@@ -676,7 +490,7 @@ export class DualStorage {
         });
 
       if (error) {
-        console.error('❌ Manual secondary upload failed:', error);
+        console.error('❌ Manual upload failed:', error);
         
         // Coba alternative method
         console.log('🔄 Trying alternative upload method...');
@@ -693,33 +507,29 @@ export class DualStorage {
         };
       }
 
-      console.log('✅ Manual secondary upload successful');
+      console.log('✅ Manual upload successful');
       return { success: true, data };
 
     } catch (error: any) {
-      console.error('❌ Manual secondary upload exception:', error);
+      console.error('❌ Manual upload exception:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Alternative upload methods untuk secondary
+   * Alternative upload methods
    */
   private static async tryAlternativeUpload(file: File, filePath: string, bucketName: string): Promise<{
     success: boolean;
     error?: string;
     data?: any;
   }> {
-    if (!supabase2) {
-      return { success: false, error: 'Secondary client not available' };
-    }
-
     try {
       // Method 1: Upload dengan path yang berbeda
       const altFilePath = `alt-${Date.now()}-${filePath}`;
       console.log(`🔧 Alternative 1: Uploading to alternative path: ${altFilePath}`);
       
-      const { data, error } = await supabase2
+      const { data, error } = await supabase
         .storage
         .from(bucketName)
         .upload(altFilePath, file, {
@@ -736,7 +546,7 @@ export class DualStorage {
       const rootFilePath = filePath.split('/').pop() || filePath;
       console.log(`🔧 Alternative 2: Uploading to root: ${rootFilePath}`);
       
-      const { data: rootData, error: rootError } = await supabase2
+      const { data: rootData, error: rootError } = await supabase
         .storage
         .from(bucketName)
         .upload(rootFilePath, file, {
@@ -757,18 +567,16 @@ export class DualStorage {
   }
 
   /**
-   * Test connections ke kedua storage
+   * Test connections ke storage
    */
   static async testConnections(bucketName: string = 'proofs'): Promise<{
     primary: { success: boolean; error?: string; details?: any };
-    secondary: { success: boolean; error?: string; details?: any };
-    environment: { primary: boolean; secondary: boolean };
+    environment: { primary: boolean };
   }> {
     if (typeof window === 'undefined') {
       return {
         primary: { success: false, error: 'Cannot test on server side' },
-        secondary: { success: false, error: 'Cannot test on server side' },
-        environment: { primary: false, secondary: false }
+        environment: { primary: false }
       };
     }
 
@@ -776,10 +584,8 @@ export class DualStorage {
     
     const results = {
       primary: { success: false } as { success: boolean; error?: string; details?: any },
-      secondary: { success: false } as { success: boolean; error?: string; details?: any },
       environment: {
-        primary: !!(supabaseUrl && supabaseAnonKey),
-        secondary: !!(supabaseUrl2 && supabaseAnonKey2 && supabase2 && secondaryEnabled)
+        primary: !!(supabaseUrl && supabaseAnonKey)
       }
     };
 
@@ -800,41 +606,19 @@ export class DualStorage {
       results.primary.error = error.message;
     }
 
-    // Test secondary - hanya jika secondary enabled
-    if (supabase2 && secondaryEnabled) {
-      try {
-        const { data, error } = await supabase2
-          .storage
-          .from(bucketName)
-          .list('', { limit: 1 });
-
-        if (error) {
-          results.secondary.error = error.message;
-        } else {
-          results.secondary.success = true;
-          results.secondary.details = { filesCount: data?.length || 0 };
-        }
-      } catch (error: any) {
-        results.secondary.error = error.message;
-      }
-    } else {
-      results.secondary.error = 'Secondary client not initialized or disabled';
-    }
-
     console.log('📊 CONNECTION TEST RESULTS:', results);
     return results;
   }
 
   /**
-   * Check file existence in both storage
+   * Check file existence in storage
    */
   static async checkFileExists(filePath: string, bucketName: string = 'proofs'): Promise<{
     primary: boolean;
-    secondary: boolean;
     inSync: boolean;
   }> {
     if (typeof window === 'undefined') {
-      return { primary: false, secondary: false, inSync: false };
+      return { primary: false, inSync: false };
     }
 
     try {
@@ -846,34 +630,18 @@ export class DualStorage {
           search: filePath.split('/').pop() 
         });
 
-      // Check secondary
-      let secondaryList = null;
-      if (supabase2 && secondaryEnabled) {
-        const { data: secList } = await supabase2
-          .storage
-          .from(bucketName)
-          .list('', { 
-            search: filePath.split('/').pop() 
-          });
-        secondaryList = secList;
-      }
-
       const primaryExists = !!primaryList && primaryList.some((file: any) => 
-        file.name === filePath.split('/').pop()
-      );
-      const secondaryExists = !!secondaryList && secondaryList.some((file: any) => 
         file.name === filePath.split('/').pop()
       );
 
       return {
         primary: primaryExists,
-        secondary: secondaryExists,
-        inSync: primaryExists && secondaryExists
+        inSync: primaryExists
       };
 
     } catch (error) {
       console.error('❌ File check error:', error);
-      return { primary: false, secondary: false, inSync: false };
+      return { primary: false, inSync: false };
     }
   }
 
@@ -884,10 +652,10 @@ export class DualStorage {
     if (typeof window === 'undefined') {
       return {
         timestamp: new Date().toISOString(),
-        environment: { primary: false, secondary: false },
-        connections: { primary: { success: false }, secondary: { success: false } },
-        health: { primary: { status: 'unknown' }, secondary: { status: 'unknown' } },
-        clients: { primary: false, secondary: false }
+        environment: { primary: false },
+        connections: { primary: { success: false } },
+        health: { primary: { status: 'unknown' } },
+        clients: { primary: false }
       };
     }
 
@@ -901,21 +669,433 @@ export class DualStorage {
           url: !!supabaseUrl,
           key: !!supabaseAnonKey,
           storageUrl: !!primaryStorageUrl
-        },
-        secondary: {
-          url: !!supabaseUrl2,
-          key: !!supabaseAnonKey2,
-          storageUrl: !!secondaryStorageUrl,
-          enabled: secondaryEnabled
         }
       },
       connections,
       health,
       clients: {
-        primary: !!supabase,
-        secondary: !!supabase2 && secondaryEnabled
+        primary: !!supabase
       }
     };
+  }
+
+  /**
+   * Batch upload multiple files
+   */
+  static async batchUpload(files: Array<{file: File, path: string}>, bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    results: Array<{path: string; success: boolean; url?: string; error?: string}>;
+    total: number;
+    succeeded: number;
+    failed: number;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        results: [],
+        total: 0,
+        succeeded: 0,
+        failed: 0
+      };
+    }
+
+    console.log(`📦 BATCH UPLOAD START: ${files.length} files`);
+    
+    const results: Array<{path: string; success: boolean; url?: string; error?: string}> = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const fileData of files) {
+      try {
+        const result = await this.upload(fileData.file, fileData.path, bucketName);
+        
+        const fileResult = {
+          path: fileData.path,
+          success: result.success,
+          url: result.url || undefined,
+          error: result.errors.length > 0 ? result.errors.join(', ') : undefined
+        };
+        
+        results.push(fileResult);
+        
+        if (result.success) {
+          succeeded++;
+        } else {
+          failed++;
+        }
+        
+        console.log(`  ${result.success ? '✅' : '❌'} ${fileData.path}`);
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error: any) {
+        console.error(`❌ Error uploading ${fileData.path}:`, error);
+        results.push({
+          path: fileData.path,
+          success: false,
+          error: error.message
+        });
+        failed++;
+      }
+    }
+
+    const overallSuccess = succeeded > 0;
+
+    console.log(`📦 BATCH UPLOAD COMPLETE: ${succeeded} succeeded, ${failed} failed`);
+    
+    return {
+      success: overallSuccess,
+      results,
+      total: files.length,
+      succeeded,
+      failed
+    };
+  }
+
+  /**
+   * Get file metadata
+   */
+  static async getFileMetadata(filePath: string, bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    metadata?: any;
+    error?: string;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Cannot get metadata on server side'
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from(bucketName)
+        .list('', {
+          search: filePath.split('/').pop()
+        });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      const file = data?.find(f => f.name === filePath.split('/').pop());
+      
+      if (!file) {
+        return {
+          success: false,
+          error: 'File not found'
+        };
+      }
+
+      return {
+        success: true,
+        metadata: file
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Move file within storage
+   */
+  static async moveFile(sourcePath: string, destinationPath: string, bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Cannot move file on server side'
+      };
+    }
+
+    try {
+      // First download the file
+      const { data: fileData, error: downloadError } = await supabase
+        .storage
+        .from(bucketName)
+        .download(sourcePath);
+
+      if (downloadError || !fileData) {
+        return {
+          success: false,
+          error: `Download failed: ${downloadError?.message || 'No file data'}`
+        };
+      }
+
+      // Upload to new location
+      const { error: uploadError } = await supabase
+        .storage
+        .from(bucketName)
+        .upload(destinationPath, fileData, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        return {
+          success: false,
+          error: `Upload failed: ${uploadError.message}`
+        };
+      }
+
+      // Delete original file
+      const { error: deleteError } = await supabase
+        .storage
+        .from(bucketName)
+        .remove([sourcePath]);
+
+      if (deleteError) {
+        console.warn(`⚠️ Could not delete original file ${sourcePath}: ${deleteError.message}`);
+        // We still consider it a success since the file was moved
+      }
+
+      console.log(`✅ File moved from ${sourcePath} to ${destinationPath}`);
+      return {
+        success: true
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Copy file within storage
+   */
+  static async copyFile(sourcePath: string, destinationPath: string, bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Cannot copy file on server side'
+      };
+    }
+
+    try {
+      // First download the file
+      const { data: fileData, error: downloadError } = await supabase
+        .storage
+        .from(bucketName)
+        .download(sourcePath);
+
+      if (downloadError || !fileData) {
+        return {
+          success: false,
+          error: `Download failed: ${downloadError?.message || 'No file data'}`
+        };
+      }
+
+      // Upload to new location
+      const { error: uploadError } = await supabase
+        .storage
+        .from(bucketName)
+        .upload(destinationPath, fileData, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        return {
+          success: false,
+          error: `Upload failed: ${uploadError.message}`
+        };
+      }
+
+      console.log(`✅ File copied from ${sourcePath} to ${destinationPath}`);
+      return {
+        success: true
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Create folder in storage
+   */
+  static async createFolder(folderPath: string, bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Cannot create folder on server side'
+      };
+    }
+
+    try {
+      // Supabase doesn't have explicit folder creation, we create an empty file
+      const folderMarkerPath = folderPath.endsWith('/') ? `${folderPath}.folder` : `${folderPath}/.folder`;
+      
+      const { error } = await supabase
+        .storage
+        .from(bucketName)
+        .upload(folderMarkerPath, new Blob([]), {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        return {
+          success: false,
+          error: `Folder creation failed: ${error.message}`
+        };
+      }
+
+      console.log(`✅ Folder created: ${folderPath}`);
+      return {
+        success: true
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get storage usage information
+   */
+  static async getStorageUsage(bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    totalFiles?: number;
+    approximateSize?: number;
+    error?: string;
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Cannot get usage on server side'
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from(bucketName)
+        .list('', {
+          limit: 1000 // Max limit
+        });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      const totalFiles = data?.length || 0;
+      const approximateSize = data?.reduce((total, file) => total + (file.metadata?.size || 0), 0) || 0;
+
+      return {
+        success: true,
+        totalFiles,
+        approximateSize
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Clean up empty folders
+   */
+  static async cleanupEmptyFolders(bucketName: string = 'proofs'): Promise<{
+    success: boolean;
+    cleaned: number;
+    errors: string[];
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        cleaned: 0,
+        errors: ['Cannot cleanup on server side']
+      };
+    }
+
+    console.log('🧹 Cleaning up empty folders...');
+    
+    let cleaned = 0;
+    const errors: string[] = [];
+
+    try {
+      // Note: This is a simplified implementation
+      // In production, you'd need a more sophisticated algorithm
+      const { data: folders } = await supabase
+        .storage
+        .from(bucketName)
+        .list('');
+
+      if (!folders) {
+        return {
+          success: true,
+          cleaned: 0,
+          errors: []
+        };
+      }
+
+      // Find and remove folder marker files
+      for (const folder of folders) {
+        if (folder.name === '.folder') {
+          try {
+            const { error } = await supabase
+              .storage
+              .from(bucketName)
+              .remove([folder.name]);
+
+            if (!error) {
+              cleaned++;
+              console.log(`✅ Removed folder marker: ${folder.name}`);
+            } else {
+              errors.push(`Failed to remove ${folder.name}: ${error.message}`);
+            }
+          } catch (error: any) {
+            errors.push(`Error removing ${folder.name}: ${error.message}`);
+          }
+        }
+      }
+
+      return {
+        success: errors.length === 0,
+        cleaned,
+        errors
+      };
+
+    } catch (error: any) {
+      console.error('❌ Cleanup error:', error);
+      return {
+        success: false,
+        cleaned: 0,
+        errors: [error.message]
+      };
+    }
   }
 }
 

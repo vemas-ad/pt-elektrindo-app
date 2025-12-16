@@ -33,25 +33,34 @@ export default function LoginPage() {
     try {
       if (!email.endsWith("@gmail.com")) {
         alert("Hanya email @gmail.com yang diperbolehkan.");
+        setLoading(false);
         return;
       }
 
-      let userRole = "user";
-      if (password === "Eltama01") userRole = "silver";
-      else if (password === "Eltama03") userRole = "master";
-      else {
-        alert("Password salah.");
+      // Validasi password tidak kosong
+      if (!password.trim()) {
+        alert("Password harus diisi.");
+        setLoading(false);
         return;
       }
 
-      const { error: signError } =
+      // Coba login terlebih dahulu
+      const { data: signData, error: signError } = 
         await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-      // 🔹 AUTO REGISTER
+      // 🔹 AUTO REGISTER jika user belum ada
       if (signError && signError.message.includes("Invalid login credentials")) {
+        // Determine role berdasarkan pola email atau default ke 'user'
+        let userRole = "user";
+        if (email.includes("admin") || email.includes("master")) {
+          userRole = "master";
+        } else if (email.includes("silver") || email.includes("engineer")) {
+          userRole = "silver";
+        }
+
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -62,9 +71,11 @@ export default function LoginPage() {
 
         if (signUpError) {
           alert("Pendaftaran gagal: " + signUpError.message);
+          setLoading(false);
           return;
         }
 
+        // Coba login setelah register
         const { error: retryError } =
           await supabase.auth.signInWithPassword({
             email,
@@ -73,11 +84,26 @@ export default function LoginPage() {
 
         if (retryError) {
           alert("Login gagal setelah pendaftaran");
+          setLoading(false);
           return;
         }
       } else if (signError) {
         alert("Login gagal: " + signError.message);
+        setLoading(false);
         return;
+      }
+
+      // 🔹 GET USER DATA setelah login berhasil
+      const { data: userData } = await supabase.auth.getUser();
+      
+      // Tentukan role dari user metadata atau default
+      let userRole = "user";
+      if (userData?.user?.user_metadata?.role) {
+        userRole = userData.user.user_metadata.role;
+      } else if (email.includes("admin") || email.includes("master")) {
+        userRole = "master";
+      } else if (email.includes("silver") || email.includes("engineer")) {
+        userRole = "silver";
       }
 
       // 🔹 LOCAL STORAGE
@@ -90,23 +116,36 @@ export default function LoginPage() {
         )}&background=random`
       );
 
-      // 🔹 UPSERT USERS (FIX 2769)
+      // 🔹 UPSERT USERS ke tabel users di Supabase
       try {
         await supabase.from("users").upsert(
           {
             email,
             role: userRole,
             last_login: new Date().toISOString(),
+            created_at: new Date().toISOString(),
           } as any,
           { onConflict: "email" }
         );
-      } catch {}
+      } catch (err) {
+        console.warn("Error upsert user:", err);
+        // Lanjutkan meskipun ada error di upsert
+      }
 
-      alert("Login berhasil!");
-      router.push("/projects");
+      console.log("Login berhasil dengan role:", userRole);
+      
+      // Redirect berdasarkan role
+      if (userRole === "master") {
+        router.push("/dashboard/master");
+      } else if (userRole === "silver") {
+        router.push("/dashboard/silver");
+      } else {
+        router.push("/projects");
+      }
+      
     } catch (err) {
-      console.error(err);
-      alert("Terjadi kesalahan.");
+      console.error("Login error:", err);
+      alert("Terjadi kesalahan sistem.");
     } finally {
       setLoading(false);
     }
@@ -135,30 +174,55 @@ export default function LoginPage() {
             onError={handleImageError}
           />
           <h1 className="font-bold">PT ELEKTRINDO UTAMA INDONESIA</h1>
+          <p className="text-sm text-gray-600">MECHANICAL - ELECTRICAL - FIRE PROTECTION</p>
         </div>
 
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="user@gmail.com"
-          className="w-full mb-3 border p-2 rounded"
-        />
+        <div className="mb-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email Anda (harus @gmail.com)"
+            className="w-full border p-2 rounded"
+            required
+          />
+          <p className="text-xs text-gray-500 mt-1">Contoh: user@gmail.com</p>
+        </div>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Eltama01 / Eltama03"
-          className="w-full mb-4 border p-2 rounded"
-        />
+        <div className="mb-4">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password Anda"
+            className="w-full border p-2 rounded"
+            required
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Password akan dibuat secara otomatis saat pertama kali login
+          </p>
+        </div>
+
+        <div className="mb-4 text-xs text-gray-600">
+          <p className="font-semibold">Informasi:</p>
+          <ul className="list-disc pl-4 mt-1">
+            <li>Email harus menggunakan @gmail.com</li>
+            <li>Sistem akan membuat akun otomatis untuk pertama kali</li>
+            <li>Role akan ditentukan berdasarkan email</li>
+          </ul>
+        </div>
 
         <button
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "Memproses..." : "Login"}
+          {loading ? "Memproses..." : "Login / Buat Akun"}
         </button>
+
+        <div className="mt-4 text-xs text-gray-500 text-center">
+          <p>© {new Date().getFullYear()} PT. Elektindo Utama Indonesia</p>
+          <p>Project Management System v1.0</p>
+        </div>
       </form>
     </div>
   );

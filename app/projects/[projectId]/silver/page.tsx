@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
-import { supabase, supabase2, DualStorage } from "../../../../lib/supabaseClient";
+import { supabase } from "../../../../lib/supabaseClient";
 import {
   LineChart,
   Line,
@@ -1433,7 +1433,7 @@ const ExportPrintControls = ({
       
       wsData.push(["PT ELEKTRINDO UTAMA INDONESIA"]);
       wsData.push(["MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM"]);
-      wsData.push(["SILVER APP - INPUT DATA LAPANGAN (DUAL STORAGE SYSTEM)"]);
+      wsData.push(["SILVER APP - INPUT DATA LAPANGAN"]);
       wsData.push([]);
       
       wsData.push(["KODE PROYEK", ":", metaProject.project_code || "-"]);
@@ -1697,7 +1697,7 @@ const ExportPrintControls = ({
           <div class="header">
             <h1>PT ELEKTRINDO UTAMA INDONESIA</h1>
             <p style="margin: 5px 0; font-size: 10pt; color: #666;">MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM</p>
-            <p style="margin: 5px 0; font-size: 9pt; color: #2c5aa0; font-weight: bold;">SILVER APP - INPUT DATA LAPANGAN (DUAL STORAGE SYSTEM)</p>
+            <p style="margin: 5px 0; font-size: 9pt; color: #2c5aa0; font-weight: bold;">SILVER APP - INPUT DATA LAPANGAN</p>
           </div>
           
           <h1>${projectName} - ${tabName}</h1>
@@ -1883,462 +1883,459 @@ const ExportPrintControls = ({
   };
 
   // PERBAIKAN: Print to PDF dengan kertas A3 dan perbaikan total %
-// PERBAIKAN FINAL: Print to PDF dengan split table OTOMATIS dan penyesuaian kertas A3
-// PERBAIKAN FINAL: Print to PDF dengan penyesuaian otomatis untuk tabel panjang
-const printToPDF = async () => {
-  try {
-    setIsPrinting(true);
-    
-    const { default: jsPDF } = await import('jspdf');
-    const autoTableImport = await import('jspdf-autotable');
-    const autoTable = autoTableImport.default || (autoTableImport as any);
-    
-    // PERBAIKAN: Gunakan kertas A3 (420 x 297 mm) dengan margin yang lebih kecil
-    const pdf = new jsPDF('landscape', 'mm', 'a3');
-    const pageWidth = pdf.internal.pageSize.getWidth();  // ~420mm
-    const pageHeight = pdf.internal.pageSize.getHeight(); // ~297mm
-    
-    const userInfo = getUserInfo();
-    const currentRows = activeTab === 1 ? rows : activeTab === 3 ? targetRows : realisasiRows;
-    const currentSummary = activeTab === 1 ? planningSummary : activeTab === 3 ? targetSummary : realisasiSummary;
-    const tabName = activeTab === 1 ? 'Planning' : activeTab === 3 ? 'Target' : activeTab === 4 ? 'Realisasi' : 'Catatan';
-    
-    let chartImage = '';
-    if (activeTab !== 5) {
-      const chartId = activeTab === 1 ? 'planning-chart' : activeTab === 3 ? 'target-chart' : 'realisasi-chart';
-      chartImage = await captureChartAsImage(chartId);
-    }
-    
-    // Header tetap seperti sebelumnya...
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-    
-    pdf.setFontSize(24);
-    pdf.setTextColor(44, 90, 160);
-    pdf.setFont("helvetica", "bold");
-    pdf.text('PT ELEKTRINDO UTAMA INDONESIA', pageWidth/2 - pdf.getTextWidth('PT ELEKTRINDO UTAMA INDONESIA')/2, 20);
-    
-    pdf.setFontSize(14);
-    pdf.setTextColor(102, 102, 102);
-    pdf.setFont("helvetica", "normal");
-    pdf.text('MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM', pageWidth/2 - pdf.getTextWidth('MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM')/2, 30);
-    
-    pdf.setFontSize(12);
-    pdf.setTextColor(44, 90, 160);
-    pdf.setFont("helvetica", "bold");
-    pdf.text('SILVER APP - INPUT DATA LAPANGAN (DUAL STORAGE SYSTEM)', pageWidth/2 - pdf.getTextWidth('SILVER APP - INPUT DATA LAPANGAN (DUAL STORAGE SYSTEM')/2, 40);
-    
-    pdf.setDrawColor(44, 90, 160);
-    pdf.setLineWidth(0.5);
-    pdf.line(10, 45, pageWidth - 10, 45);
-    
-    pdf.setFontSize(18);
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(`${projectName} - ${tabName}`, 10, 60);
-    
-    pdf.setFontSize(11);
-    pdf.setFont("helvetica", "normal");
-    const projectInfo = [
-      ['Kode Proyek', metaProject.project_code || '-'],
-      ['Job Name', metaProject.job_name || '-'],
-      ['Client', metaProject.client || '-'],
-      ['Alamat', metaProject.address || '-'],
-      ['Deadline', metaProject.deadline ? new Date(metaProject.deadline).toLocaleDateString('id-ID') : '-']
-    ];
-    
-    let yPos = 70;
-    projectInfo.forEach(([label, value]) => {
-      pdf.setFont("helvetica", "bold");
-      pdf.text(`${label}:`, 10, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(value, 40, yPos);
-      yPos += 8;
-    });
-    
-    yPos += 10;
-    
-    pdf.setFontSize(16);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(44, 90, 160);
-    pdf.text('KURVA S PROGRESS', 10, yPos);
-    yPos += 12;
-    
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont("helvetica", "bold");
-    pdf.text('Summary:', 10, yPos);
-    yPos += 8;
-    
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Total Bobot: ${currentSummary.totalWeight.toFixed(2).replace('.', ',')}%`, 15, yPos);
-    yPos += 7;
-    
-    // PERBAIKAN 2: Hitung total % dari tabel
-    const dateCumulativeTotals: Record<string, number> = {};
-    dateCols.forEach((date, index) => {
-      dateCumulativeTotals[date] = 0;
-    });
-    
-    // Hitung total kumulatif dari tabel
-    currentRows.forEach(row => {
-      dateCols.forEach((date, idx) => {
-        const dateValue = parseFloat(row.dates?.[date]?.toString() || '0');
-        if (idx === 0) {
-          dateCumulativeTotals[date] = dateValue;
-        } else {
-          const prevDate = dateCols[idx - 1];
-          dateCumulativeTotals[date] = dateCumulativeTotals[prevDate] + dateValue;
-        }
-      });
-    });
-    
-    const totalPercentageFromTable = dateCumulativeTotals[dateCols[dateCols.length - 1]] || 0;
-    
-    if (activeTab === 1) {
-      pdf.text(`Plan Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
-      yPos += 7;
-      pdf.text(`Actual Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
-      yPos += 7;
-    } else if (activeTab === 3) {
-      pdf.text(`Target Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
-      yPos += 7;
-    } else if (activeTab === 4) {
-      pdf.text(`Realisasi Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
-      yPos += 7;
-    }
-    
-    pdf.text(`Status: ${currentSummary.isValidWeight ? 'VALID' : 'INVALID'}`, 15, yPos);
-    yPos += 20;
-    
-    // ========== PERBAIKAN UTAMA: TABEL DINAMIS ==========
-    if (activeTab === 5) {
-      // Kode untuk tab catatan tetap sama...
-      pdf.setFontSize(15);
-      pdf.setFont("helvetica", "bold");
-      pdf.text('Catatan Lapangan:', 10, yPos);
-      yPos += 12;
+  const printToPDF = async () => {
+    try {
+      setIsPrinting(true);
       
-      pdf.setFontSize(10);
+      const { default: jsPDF } = await import('jspdf');
+      const autoTableImport = await import('jspdf-autotable');
+      const autoTable = autoTableImport.default || (autoTableImport as any);
+      
+      // PERBAIKAN: Gunakan kertas A3 (420 x 297 mm) dengan margin yang lebih kecil
+      const pdf = new jsPDF('landscape', 'mm', 'a3');
+      const pageWidth = pdf.internal.pageSize.getWidth();  // ~420mm
+      const pageHeight = pdf.internal.pageSize.getHeight(); // ~297mm
+      
+      const userInfo = getUserInfo();
+      const currentRows = activeTab === 1 ? rows : activeTab === 3 ? targetRows : realisasiRows;
+      const currentSummary = activeTab === 1 ? planningSummary : activeTab === 3 ? targetSummary : realisasiSummary;
+      const tabName = activeTab === 1 ? 'Planning' : activeTab === 3 ? 'Target' : activeTab === 4 ? 'Realisasi' : 'Catatan';
+      
+      let chartImage = '';
+      if (activeTab !== 5) {
+        const chartId = activeTab === 1 ? 'planning-chart' : activeTab === 3 ? 'target-chart' : 'realisasi-chart';
+        chartImage = await captureChartAsImage(chartId);
+      }
+      
+      // Header tetap seperti sebelumnya...
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      pdf.setFontSize(24);
+      pdf.setTextColor(44, 90, 160);
+      pdf.setFont("helvetica", "bold");
+      pdf.text('PT ELEKTRINDO UTAMA INDONESIA', pageWidth/2 - pdf.getTextWidth('PT ELEKTRINDO UTAMA INDONESIA')/2, 20);
+      
+      pdf.setFontSize(14);
+      pdf.setTextColor(102, 102, 102);
       pdf.setFont("helvetica", "normal");
-      notes.forEach((note, index) => {
-        if (yPos > pageHeight - 30) {
-          pdf.addPage('landscape');
-          yPos = 20;
-        }
-        
-        pdf.setFont("helvetica", "bold");
-        pdf.text(`${index + 1}. ${new Date(note.created_at).toLocaleDateString('id-ID')} - ${note.created_by}`, 15, yPos);
-        yPos += 7;
-        
-        const lines = pdf.splitTextToSize(note.content, pageWidth - 30);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(lines, 20, yPos);
-        yPos += (lines.length * 5) + 8;
-        
-        if (note.audio_url) {
-          pdf.text(`Audio: Tersedia`, 20, yPos);
-          yPos += 5;
-        }
-        
-        yPos += 5;
-      });
-    } else {
-      // PERBAIKAN: Definisikan headers di dalam scope ini
-      const tableHeaders = [
-        'No',
-        'Description',
-        'Bobot %',
-        ...(activeTab === 1 ? ['Target (%)', 'Realisasi (%)'] : activeTab === 3 ? ['Target (%)'] : ['Realisasi (%)']),
-        'Lokasi',
-        ...dateCols.map((date, idx) => {
-          // Potong header jika terlalu panjang
-          return date.length > 12 ? date.substring(0, 10) + '...' : date;
-        }),
-        'Bukti'
+      pdf.text('MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM', pageWidth/2 - pdf.getTextWidth('MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM')/2, 30);
+      
+      pdf.setFontSize(12);
+      pdf.setTextColor(44, 90, 160);
+      pdf.setFont("helvetica", "bold");
+      pdf.text('SILVER APP - INPUT DATA LAPANGAN', pageWidth/2 - pdf.getTextWidth('SILVER APP - INPUT DATA LAPANGAN')/2, 40);
+      
+      pdf.setDrawColor(44, 90, 160);
+      pdf.setLineWidth(0.5);
+      pdf.line(10, 45, pageWidth - 10, 45);
+      
+      pdf.setFontSize(18);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`${projectName} - ${tabName}`, 10, 60);
+      
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      const projectInfo = [
+        ['Kode Proyek', metaProject.project_code || '-'],
+        ['Job Name', metaProject.job_name || '-'],
+        ['Client', metaProject.client || '-'],
+        ['Alamat', metaProject.address || '-'],
+        ['Deadline', metaProject.deadline ? new Date(metaProject.deadline).toLocaleDateString('id-ID') : '-']
       ];
       
-      // PERBAIKAN: Siapkan data untuk tabel
-      const data = [];
-      for (let i = 0; i < currentRows.length; i++) {
-        const row = currentRows[i];
-        const rowData = [
-          (i + 1).toString(),
-          (row.description?.substring(0, 35) || '') + (row.description && row.description.length > 35 ? '...' : ''),
-          parseFloat(row.weight?.toString() || '0').toFixed(1).replace('.', ','),
-          ...(activeTab === 1 ? [
-            parseFloat(row.plan_progress?.toString() || '0').toFixed(1).replace('.', ','),
-            parseFloat(row.actual_progress?.toString() || '0').toFixed(1).replace('.', ',')
-          ] : activeTab === 3 ? [
-            parseFloat(row.plan_progress?.toString() || '0').toFixed(1).replace('.', ',')
-          ] : [
-            parseFloat(row.actual_progress?.toString() || '0').toFixed(1).replace('.', ',')
-          ]),
-          (row.location?.substring(0, 25) || '') + (row.location && row.location.length > 25 ? '...' : ''),
-        ];
-        
-        // Kolom tanggal
+      let yPos = 70;
+      projectInfo.forEach(([label, value]) => {
+        pdf.setFont("helvetica", "bold");
+        pdf.text(`${label}:`, 10, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(value, 40, yPos);
+        yPos += 8;
+      });
+      
+      yPos += 10;
+      
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(44, 90, 160);
+      pdf.text('KURVA S PROGRESS', 10, yPos);
+      yPos += 12;
+      
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont("helvetica", "bold");
+      pdf.text('Summary:', 10, yPos);
+      yPos += 8;
+      
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Total Bobot: ${currentSummary.totalWeight.toFixed(2).replace('.', ',')}%`, 15, yPos);
+      yPos += 7;
+      
+      // PERBAIKAN 2: Hitung total % dari tabel
+      const dateCumulativeTotals: Record<string, number> = {};
+      dateCols.forEach((date, index) => {
+        dateCumulativeTotals[date] = 0;
+      });
+      
+      // Hitung total kumulatif dari tabel
+      currentRows.forEach(row => {
         dateCols.forEach((date, idx) => {
           const dateValue = parseFloat(row.dates?.[date]?.toString() || '0');
-          rowData.push(dateValue.toFixed(1).replace('.', ','));
-        });
-        
-        rowData.push(row.proof_url || row.is_uploaded ? '✓' : '✗');
-        data.push(rowData);
-      }
-      
-      // PERBAIKAN: Tambah total row dengan nilai kumulatif
-      if (data.length > 0) {
-        const totalRow = ['', 'TOTAL %', '', ...(activeTab === 1 ? ['', ''] : activeTab === 3 ? [''] : ['']), ''];
-        
-        dateCols.forEach((date, idx) => {
-          let cumulativeTotal = 0;
-          for (let i = 0; i <= idx; i++) {
-            const currentDate = dateCols[i];
-            const dateTotal = currentRows.reduce((sum, row) => {
-              return sum + parseFloat(row.dates?.[currentDate]?.toString() || '0');
-            }, 0);
-            cumulativeTotal += dateTotal;
+          if (idx === 0) {
+            dateCumulativeTotals[date] = dateValue;
+          } else {
+            const prevDate = dateCols[idx - 1];
+            dateCumulativeTotals[date] = dateCumulativeTotals[prevDate] + dateValue;
           }
-          totalRow.push(cumulativeTotal.toFixed(1).replace('.', ','));
         });
-        
-        totalRow.push('');
-        data.push(totalRow);
+      });
+      
+      const totalPercentageFromTable = dateCumulativeTotals[dateCols[dateCols.length - 1]] || 0;
+      
+      if (activeTab === 1) {
+        pdf.text(`Plan Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
+        yPos += 7;
+        pdf.text(`Actual Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
+        yPos += 7;
+      } else if (activeTab === 3) {
+        pdf.text(`Target Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
+        yPos += 7;
+      } else if (activeTab === 4) {
+        pdf.text(`Realisasi Progress: ${totalPercentageFromTable.toFixed(2).replace('.', ',')}%`, 15, yPos);
+        yPos += 7;
       }
       
-      // PERBAIKAN KRITIS: Hitung lebar kolom secara dinamis
-      const totalColumns = tableHeaders.length;
-      const availableWidth = pageWidth - 20; // Margin kiri-kanan 10mm
+      pdf.text(`Status: ${currentSummary.isValidWeight ? 'VALID' : 'INVALID'}`, 15, yPos);
+      yPos += 20;
       
-      // Buat objek columnStyles dinamis
-      const columnStyles: any = {};
-      
-      // Atur lebar default berdasarkan jumlah kolom
-      if (totalColumns <= 10) {
-        // Sedikit kolom: lebar normal
-        columnStyles[0] = { cellWidth: 12 };
-        columnStyles[1] = { cellWidth: 50 };
-        columnStyles[2] = { cellWidth: 18 };
+      // ========== PERBAIKAN UTAMA: TABEL DINAMIS ==========
+      if (activeTab === 5) {
+        // Kode untuk tab catatan tetap sama...
+        pdf.setFontSize(15);
+        pdf.setFont("helvetica", "bold");
+        pdf.text('Catatan Lapangan:', 10, yPos);
+        yPos += 12;
         
-        if (activeTab === 1) {
-          columnStyles[3] = { cellWidth: 18 };
-          columnStyles[4] = { cellWidth: 18 };
-          columnStyles[5] = { cellWidth: 35 };
-        } else if (activeTab === 3) {
-          columnStyles[3] = { cellWidth: 18 };
-          columnStyles[4] = { cellWidth: 35 };
-        } else if (activeTab === 4) {
-          columnStyles[3] = { cellWidth: 18 };
-          columnStyles[4] = { cellWidth: 35 };
-        }
-        
-        // Kolom tanggal
-        const dateColumnStart = activeTab === 1 ? 6 : 5;
-        const dateColumnsCount = dateCols.length;
-        const dateWidth = Math.min(20, availableWidth / (totalColumns + 2));
-        
-        for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
-          columnStyles[i] = { cellWidth: dateWidth };
-        }
-        
-        columnStyles[totalColumns - 1] = { cellWidth: 12, halign: 'center' };
-        
-      } else if (totalColumns <= 20) {
-        // Sedang kolom: lebih kompak
-        columnStyles[0] = { cellWidth: 10 };
-        columnStyles[1] = { cellWidth: 40 };
-        columnStyles[2] = { cellWidth: 15 };
-        
-        if (activeTab === 1) {
-          columnStyles[3] = { cellWidth: 15 };
-          columnStyles[4] = { cellWidth: 15 };
-          columnStyles[5] = { cellWidth: 30 };
-        } else if (activeTab === 3) {
-          columnStyles[3] = { cellWidth: 15 };
-          columnStyles[4] = { cellWidth: 30 };
-        } else if (activeTab === 4) {
-          columnStyles[3] = { cellWidth: 15 };
-          columnStyles[4] = { cellWidth: 30 };
-        }
-        
-        // Kolom tanggal lebih kecil
-        const dateColumnStart = activeTab === 1 ? 6 : 5;
-        const dateColumnsCount = dateCols.length;
-        const dateWidth = Math.min(15, availableWidth / (totalColumns + 3));
-        
-        for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
-          columnStyles[i] = { cellWidth: dateWidth };
-        }
-        
-        columnStyles[totalColumns - 1] = { cellWidth: 10, halign: 'center' };
-        
-      } else {
-        // Banyak kolom: sangat kompak
-        columnStyles[0] = { cellWidth: 8 };
-        columnStyles[1] = { cellWidth: 35 };
-        columnStyles[2] = { cellWidth: 12 };
-        
-        if (activeTab === 1) {
-          columnStyles[3] = { cellWidth: 12 };
-          columnStyles[4] = { cellWidth: 12 };
-          columnStyles[5] = { cellWidth: 25 };
-        } else if (activeTab === 3) {
-          columnStyles[3] = { cellWidth: 12 };
-          columnStyles[4] = { cellWidth: 25 };
-        } else if (activeTab === 4) {
-          columnStyles[3] = { cellWidth: 12 };
-          columnStyles[4] = { cellWidth: 25 };
-        }
-        
-        // Kolom tanggal sangat kecil
-        const dateColumnStart = activeTab === 1 ? 6 : 5;
-        const dateColumnsCount = dateCols.length;
-        const dateWidth = Math.min(10, availableWidth / (totalColumns + 5));
-        
-        for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
-          columnStyles[i] = { cellWidth: dateWidth };
-        }
-        
-        columnStyles[totalColumns - 1] = { cellWidth: 8, halign: 'center' };
-      }
-      
-      // PERBAIKAN: Gunakan font size dinamis berdasarkan jumlah kolom
-      const fontSize = totalColumns <= 10 ? 9 : 
-                      totalColumns <= 20 ? 8 : 
-                      7;
-      
-      // PERBAIKAN: Konfigurasi autoTable yang lebih fleksibel
-      const tableOptions: any = {
-        head: [tableHeaders],
-        body: data,
-        startY: yPos,
-        theme: 'grid',
-        styles: { 
-          fontSize: fontSize,
-          cellPadding: 2,
-          overflow: 'linebreak',
-          lineColor: [200, 200, 200],
-          lineWidth: 0.1,
-          minCellHeight: 7
-        },
-        headStyles: { 
-          fillColor: [44, 90, 160],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: fontSize + 1,
-          cellPadding: 3,
-          overflow: 'linebreak'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
-        },
-        margin: { left: 5, right: 5, top: 5 },
-        tableWidth: 'auto',
-        columnStyles: columnStyles,
-        showHead: 'firstPage',
-        // PERBAIKAN: Tambah pengaturan untuk split otomatis
-        rowPageBreak: 'auto',
-        tableLineWidth: 0.1,
-        tableLineColor: [200, 200, 200],
-        didDrawPage: (data: any) => {
-          // PERBAIKAN 1: Akses pageNumber dengan cara yang benar
-          const pageNumber = pdf.internal.pages ? pdf.internal.pages.length : 1;
-          const currentPage = data.pageNumber || 1;
-          
-          // Footer untuk semua halaman
-          pdf.setFillColor(44, 90, 160);
-          pdf.rect(0, pageHeight - 15, pageWidth, 15, 'F');
-          
-          pdf.setTextColor(255, 255, 255);
-          pdf.setFontSize(8);
-          pdf.text(
-            `Dicetak oleh: ${userInfo.email} | Tanggal: ${userInfo.timestamp}`,
-            10,
-            pageHeight - 8
-          );
-          
-          pdf.text(
-            `Halaman ${currentPage} dari ${pageNumber}`,
-            pageWidth - 30,
-            pageHeight - 8
-          );
-        },
-        // PERBAIKAN: Hook untuk menangani overflow
-        didParseCell: (data: any) => {
-          // Biarkan autoTable menangani parsing cell
-        },
-        // PERBAIKAN: Hook sebelum menggambar cell
-        willDrawCell: (data: any) => {
-          // Biarkan autoTable menggambar cell
-        }
-      };
-      
-      // PERBAIKAN: Generate tabel dengan autoTable
-      try {
-        autoTable(pdf, tableOptions);
-        
-        // Dapatkan posisi Y akhir setelah tabel
-        const finalY = (pdf as any).lastAutoTable?.finalY || yPos + 100;
-        yPos = finalY + 10;
-        
-      } catch (tableError) {
-        console.error('Error generating table:', tableError);
-        // Fallback: tabel sederhana
         pdf.setFontSize(10);
-        pdf.text('⚠️ Tabel terlalu besar. Gunakan export Excel untuk data lengkap.', 10, yPos);
-        yPos += 10;
-      }
-    }
-    
-    // PERBAIKAN: Tambahkan chart jika ada
-    if (chartImage && activeTab !== 5) {
-      try {
-        const img = new Image();
-        img.src = chartImage;
-        
-        await new Promise((resolve) => {
-          img.onload = () => {
-            // Pastikan ada cukup space
-            if (yPos > pageHeight - 100) {
-              pdf.addPage('landscape');
-              yPos = 20;
-            }
-            
-            const imgWidth = pageWidth - 20;
-            const imgHeight = Math.min((img.height * imgWidth) / img.width, 120);
-            
-            pdf.setFontSize(12);
-            pdf.setFont("helvetica", "bold");
-            pdf.text('Kurva S - Progress Berkelanjutan', 10, yPos);
-            yPos += 8;
-            
-            pdf.addImage(img, 'JPEG', 10, yPos, imgWidth, imgHeight);
-            yPos += imgHeight + 15;
-            resolve(true);
-          };
-          img.onerror = () => resolve(false);
-          setTimeout(() => resolve(false), 2000);
+        pdf.setFont("helvetica", "normal");
+        notes.forEach((note, index) => {
+          if (yPos > pageHeight - 30) {
+            pdf.addPage('landscape');
+            yPos = 20;
+          }
+          
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`${index + 1}. ${new Date(note.created_at).toLocaleDateString('id-ID')} - ${note.created_by}`, 15, yPos);
+          yPos += 7;
+          
+          const lines = pdf.splitTextToSize(note.content, pageWidth - 30);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(lines, 20, yPos);
+          yPos += (lines.length * 5) + 8;
+          
+          if (note.audio_url) {
+            pdf.text(`Audio: Tersedia`, 20, yPos);
+            yPos += 5;
+          }
+          
+          yPos += 5;
         });
-      } catch (e) {
-        console.log('Gagal menambahkan chart ke PDF:', e);
+      } else {
+        // PERBAIKAN: Definisikan headers di dalam scope ini
+        const tableHeaders = [
+          'No',
+          'Description',
+          'Bobot %',
+          ...(activeTab === 1 ? ['Target (%)', 'Realisasi (%)'] : activeTab === 3 ? ['Target (%)'] : ['Realisasi (%)']),
+          'Lokasi',
+          ...dateCols.map((date, idx) => {
+            // Potong header jika terlalu panjang
+            return date.length > 12 ? date.substring(0, 10) + '...' : date;
+          }),
+          'Bukti'
+        ];
+        
+        // PERBAIKAN: Siapkan data untuk tabel
+        const data = [];
+        for (let i = 0; i < currentRows.length; i++) {
+          const row = currentRows[i];
+          const rowData = [
+            (i + 1).toString(),
+            (row.description?.substring(0, 35) || '') + (row.description && row.description.length > 35 ? '...' : ''),
+            parseFloat(row.weight?.toString() || '0').toFixed(1).replace('.', ','),
+            ...(activeTab === 1 ? [
+              parseFloat(row.plan_progress?.toString() || '0').toFixed(1).replace('.', ','),
+              parseFloat(row.actual_progress?.toString() || '0').toFixed(1).replace('.', ',')
+            ] : activeTab === 3 ? [
+              parseFloat(row.plan_progress?.toString() || '0').toFixed(1).replace('.', ',')
+            ] : [
+              parseFloat(row.actual_progress?.toString() || '0').toFixed(1).replace('.', ',')
+            ]),
+            (row.location?.substring(0, 25) || '') + (row.location && row.location.length > 25 ? '...' : ''),
+          ];
+          
+          // Kolom tanggal
+          dateCols.forEach((date, idx) => {
+            const dateValue = parseFloat(row.dates?.[date]?.toString() || '0');
+            rowData.push(dateValue.toFixed(1).replace('.', ','));
+          });
+          
+          rowData.push(row.proof_url || row.is_uploaded ? '✓' : '✗');
+          data.push(rowData);
+        }
+        
+        // PERBAIKAN: Tambah total row dengan nilai kumulatif
+        if (data.length > 0) {
+          const totalRow = ['', 'TOTAL %', '', ...(activeTab === 1 ? ['', ''] : activeTab === 3 ? [''] : ['']), ''];
+          
+          dateCols.forEach((date, idx) => {
+            let cumulativeTotal = 0;
+            for (let i = 0; i <= idx; i++) {
+              const currentDate = dateCols[i];
+              const dateTotal = currentRows.reduce((sum, row) => {
+                return sum + parseFloat(row.dates?.[currentDate]?.toString() || '0');
+              }, 0);
+              cumulativeTotal += dateTotal;
+            }
+            totalRow.push(cumulativeTotal.toFixed(1).replace('.', ','));
+          });
+          
+          totalRow.push('');
+          data.push(totalRow);
+        }
+        
+        // PERBAIKAN KRITIS: Hitung lebar kolom secara dinamis
+        const totalColumns = tableHeaders.length;
+        const availableWidth = pageWidth - 20; // Margin kiri-kanan 10mm
+        
+        // Buat objek columnStyles dinamis
+        const columnStyles: any = {};
+        
+        // Atur lebar default berdasarkan jumlah kolom
+        if (totalColumns <= 10) {
+          // Sedikit kolom: lebar normal
+          columnStyles[0] = { cellWidth: 12 };
+          columnStyles[1] = { cellWidth: 50 };
+          columnStyles[2] = { cellWidth: 18 };
+          
+          if (activeTab === 1) {
+            columnStyles[3] = { cellWidth: 18 };
+            columnStyles[4] = { cellWidth: 18 };
+            columnStyles[5] = { cellWidth: 35 };
+          } else if (activeTab === 3) {
+            columnStyles[3] = { cellWidth: 18 };
+            columnStyles[4] = { cellWidth: 35 };
+          } else if (activeTab === 4) {
+            columnStyles[3] = { cellWidth: 18 };
+            columnStyles[4] = { cellWidth: 35 };
+          }
+          
+          // Kolom tanggal
+          const dateColumnStart = activeTab === 1 ? 6 : 5;
+          const dateColumnsCount = dateCols.length;
+          const dateWidth = Math.min(20, availableWidth / (totalColumns + 2));
+          
+          for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
+            columnStyles[i] = { cellWidth: dateWidth };
+          }
+          
+          columnStyles[totalColumns - 1] = { cellWidth: 12, halign: 'center' };
+          
+        } else if (totalColumns <= 20) {
+          // Sedang kolom: lebih kompak
+          columnStyles[0] = { cellWidth: 10 };
+          columnStyles[1] = { cellWidth: 40 };
+          columnStyles[2] = { cellWidth: 15 };
+          
+          if (activeTab === 1) {
+            columnStyles[3] = { cellWidth: 15 };
+            columnStyles[4] = { cellWidth: 15 };
+            columnStyles[5] = { cellWidth: 30 };
+          } else if (activeTab === 3) {
+            columnStyles[3] = { cellWidth: 15 };
+            columnStyles[4] = { cellWidth: 30 };
+          } else if (activeTab === 4) {
+            columnStyles[3] = { cellWidth: 15 };
+            columnStyles[4] = { cellWidth: 30 };
+          }
+          
+          // Kolom tanggal lebih kecil
+          const dateColumnStart = activeTab === 1 ? 6 : 5;
+          const dateColumnsCount = dateCols.length;
+          const dateWidth = Math.min(15, availableWidth / (totalColumns + 3));
+          
+          for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
+            columnStyles[i] = { cellWidth: dateWidth };
+          }
+          
+          columnStyles[totalColumns - 1] = { cellWidth: 10, halign: 'center' };
+          
+        } else {
+          // Banyak kolom: sangat kompak
+          columnStyles[0] = { cellWidth: 8 };
+          columnStyles[1] = { cellWidth: 35 };
+          columnStyles[2] = { cellWidth: 12 };
+          
+          if (activeTab === 1) {
+            columnStyles[3] = { cellWidth: 12 };
+            columnStyles[4] = { cellWidth: 12 };
+            columnStyles[5] = { cellWidth: 25 };
+          } else if (activeTab === 3) {
+            columnStyles[3] = { cellWidth: 12 };
+            columnStyles[4] = { cellWidth: 25 };
+          } else if (activeTab === 4) {
+            columnStyles[3] = { cellWidth: 12 };
+            columnStyles[4] = { cellWidth: 25 };
+          }
+          
+          // Kolom tanggal sangat kecil
+          const dateColumnStart = activeTab === 1 ? 6 : 5;
+          const dateColumnsCount = dateCols.length;
+          const dateWidth = Math.min(10, availableWidth / (totalColumns + 5));
+          
+          for (let i = dateColumnStart; i < dateColumnStart + dateColumnsCount; i++) {
+            columnStyles[i] = { cellWidth: dateWidth };
+          }
+          
+          columnStyles[totalColumns - 1] = { cellWidth: 8, halign: 'center' };
+        }
+        
+        // PERBAIKAN: Gunakan font size dinamis berdasarkan jumlah kolom
+        const fontSize = totalColumns <= 10 ? 9 : 
+                        totalColumns <= 20 ? 8 : 
+                        7;
+        
+        // PERBAIKAN: Konfigurasi autoTable yang lebih fleksibel
+        const tableOptions: any = {
+          head: [tableHeaders],
+          body: data,
+          startY: yPos,
+          theme: 'grid',
+          styles: { 
+            fontSize: fontSize,
+            cellPadding: 2,
+            overflow: 'linebreak',
+            lineColor: [200, 200, 200],
+            lineWidth: 0.1,
+            minCellHeight: 7
+          },
+          headStyles: { 
+            fillColor: [44, 90, 160],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: fontSize + 1,
+            cellPadding: 3,
+            overflow: 'linebreak'
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          },
+          margin: { left: 5, right: 5, top: 5 },
+          tableWidth: 'auto',
+          columnStyles: columnStyles,
+          showHead: 'firstPage',
+          // PERBAIKAN: Tambah pengaturan untuk split otomatis
+          rowPageBreak: 'auto',
+          tableLineWidth: 0.1,
+          tableLineColor: [200, 200, 200],
+          didDrawPage: (data: any) => {
+            // PERBAIKAN 1: Akses pageNumber dengan cara yang benar
+            const pageNumber = pdf.internal.pages ? pdf.internal.pages.length : 1;
+            const currentPage = data.pageNumber || 1;
+            
+            // Footer untuk semua halaman
+            pdf.setFillColor(44, 90, 160);
+            pdf.rect(0, pageHeight - 15, pageWidth, 15, 'F');
+            
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(8);
+            pdf.text(
+              `Dicetak oleh: ${userInfo.email} | Tanggal: ${userInfo.timestamp}`,
+              10,
+              pageHeight - 8
+            );
+            
+            pdf.text(
+              `Halaman ${currentPage} dari ${pageNumber}`,
+              pageWidth - 30,
+              pageHeight - 8
+            );
+          },
+          // PERBAIKAN: Hook untuk menangani overflow
+          didParseCell: (data: any) => {
+            // Biarkan autoTable menangani parsing cell
+          },
+          // PERBAIKAN: Hook sebelum menggambar cell
+          willDrawCell: (data: any) => {
+            // Biarkan autoTable menggambar cell
+          }
+        };
+        
+        // PERBAIKAN: Generate tabel dengan autoTable
+        try {
+          autoTable(pdf, tableOptions);
+          
+          // Dapatkan posisi Y akhir setelah tabel
+          const finalY = (pdf as any).lastAutoTable?.finalY || yPos + 100;
+          yPos = finalY + 10;
+          
+        } catch (tableError) {
+          console.error('Error generating table:', tableError);
+          // Fallback: tabel sederhana
+          pdf.setFontSize(10);
+          pdf.text('⚠️ Tabel terlalu besar. Gunakan export Excel untuk data lengkap.', 10, yPos);
+          yPos += 10;
+        }
       }
-    }
-    
-    const fileName = `${metaProject.project_code || projectName}_KURVA_S_${tabName}_${new Date().toISOString().split('T')[0]}.pdf`;
-    pdf.save(fileName);
-    
-    // PERBAIKAN 2: Gunakan variable yang benar (tableHeaders, bukan headers)
-    const totalColsCount = activeTab === 5 ? 5 : (activeTab === 1 ? 6 : 5) + dateCols.length + 1;
-alert(`✅ Dokumen Kurva S berhasil dicetak ke ${fileName} (A3 Landscape - ${totalColsCount} kolom)`);
+      
+      // PERBAIKAN: Tambahkan chart jika ada
+      if (chartImage && activeTab !== 5) {
+        try {
+          const img = new Image();
+          img.src = chartImage;
+          
+          await new Promise((resolve) => {
+            img.onload = () => {
+              // Pastikan ada cukup space
+              if (yPos > pageHeight - 100) {
+                pdf.addPage('landscape');
+                yPos = 20;
+              }
+              
+              const imgWidth = pageWidth - 20;
+              const imgHeight = Math.min((img.height * imgWidth) / img.width, 120);
+              
+              pdf.setFontSize(12);
+              pdf.setFont("helvetica", "bold");
+              pdf.text('Kurva S - Progress Berkelanjutan', 10, yPos);
+              yPos += 8;
+              
+              pdf.addImage(img, 'JPEG', 10, yPos, imgWidth, imgHeight);
+              yPos += imgHeight + 15;
+              resolve(true);
+            };
+            img.onerror = () => resolve(false);
+            setTimeout(() => resolve(false), 2000);
+          });
+        } catch (e) {
+          console.log('Gagal menambahkan chart ke PDF:', e);
+        }
+      }
+      
+      const fileName = `${metaProject.project_code || projectName}_KURVA_S_${tabName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      const totalColsCount = activeTab === 5 ? 5 : (activeTab === 1 ? 6 : 5) + dateCols.length + 1;
+      alert(`✅ Dokumen Kurva S berhasil dicetak ke ${fileName} (A3 Landscape - ${totalColsCount} kolom)`);
 
-  } catch (error) {
-    console.error('Print to PDF error:', error);
-    alert('❌ Gagal mencetak dokumen Kurva S. Silakan coba lagi.');
-  } finally {
-    setIsPrinting(false);
-  }
-};
+    } catch (error) {
+      console.error('Print to PDF error:', error);
+      alert('❌ Gagal mencetak dokumen Kurva S. Silakan coba lagi.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   return (
     <div className="bg-white p-4 rounded shadow mb-6 ExportPrintControls">
@@ -2452,8 +2449,8 @@ const UploadSection = ({
   uploadingFiles, 
   setFile, 
   file, 
-  uploadToDualStorage, 
-  deleteFileFromDualStorage,
+  uploadToSingleStorage, 
+  deleteFileFromStorage,
   projectId,
   setRows,
   setTargetRows,
@@ -2464,8 +2461,8 @@ const UploadSection = ({
   uploadingFiles: {[key: string]: boolean};
   setFile: (file: File | null) => void;
   file: File | null;
-  uploadToDualStorage: (file: File, taskId?: string | null, rowIndex?: number, description?: string) => Promise<void>;
-  deleteFileFromDualStorage: (fileUrl: string) => Promise<void>;
+  uploadToSingleStorage: (file: File, taskId?: string | null, rowIndex?: number, description?: string) => Promise<void>;
+  deleteFileFromStorage: (fileUrl: string) => Promise<void>;
   projectId: string | undefined;
   setRows: React.Dispatch<React.SetStateAction<TaskType[]>>;
   setTargetRows: React.Dispatch<React.SetStateAction<TaskType[]>>;
@@ -2498,18 +2495,18 @@ const UploadSection = ({
     const newStatusMap = new Map(uploadStatusMap);
     newStatusMap.set(rowKey, status);
     
-setUploadStatusMap(newStatusMap as Map<string, boolean>);
+    setUploadStatusMap(newStatusMap as Map<string, boolean>);
 
-const statusObject: Record<string, boolean> = {};
-(newStatusMap as Map<string, boolean>).forEach((value, key) => {
-  statusObject[key] = value;
-});
+    const statusObject: Record<string, boolean> = {};
+    (newStatusMap as Map<string, boolean>).forEach((value, key) => {
+      statusObject[key] = value;
+    });
 
-localStorage.setItem(
-  `upload_status_${projectId}_tab${activeTab}`,
-  JSON.stringify(statusObject)
-);
-};
+    localStorage.setItem(
+      `upload_status_${projectId}_tab${activeTab}`,
+      JSON.stringify(statusObject)
+    );
+  };
 
   
   useEffect(() => {
@@ -2652,7 +2649,7 @@ localStorage.setItem(
   return (
     <div className="mt-4 p-3 bg-gray-50 rounded border">
       <div className="flex justify-between items-center mb-2">
-        <h4 className="font-semibold text-sm">📎 Upload File ke DUAL Supabase Storage</h4>
+        <h4 className="font-semibold text-sm">📎 Upload File ke Supabase Storage</h4>
         <button
           onClick={() => setShowUploadSection(!showUploadSection)}
           className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
@@ -2665,7 +2662,7 @@ localStorage.setItem(
         <>
           <div className="mb-3 p-2 bg-blue-50 rounded">
             <p className="text-xs text-blue-700">
-              🔄 <strong>DUAL STORAGE SYSTEM:</strong> File akan diupload ke kedua akun Supabase (Primary & Backup) secara otomatis
+              🔄 <strong>SINGLE STORAGE SYSTEM:</strong> File akan diupload ke Supabase storage utama saja
             </p>
             <p className="text-xs text-blue-700 mt-1">
               💡 <strong>Status upload stabil:</strong> Status tetap ✅ meski ditambah data baru
@@ -2703,8 +2700,8 @@ localStorage.setItem(
                       <FilePreview 
                         fileUrl={row.proof_url} 
                         onDelete={async () => {
-                          if (confirm("Yakin ingin menghapus file ini dari DUAL storage?")) {
-                            await deleteFileFromDualStorage(row.proof_url!);
+                          if (confirm("Yakin ingin menghapus file ini dari storage?")) {
+                            await deleteFileFromStorage(row.proof_url!);
                             
                             const updateRows = (rows: TaskType[]) => rows.map((r, idx) => {
                               const currentRowKey = r.id ? r.id : `row_${idx}`;
@@ -2745,7 +2742,7 @@ localStorage.setItem(
                           if (selectedFile) {
                             setFile(selectedFile);
                             setTimeout(() => {
-                              uploadToDualStorage(selectedFile, row.id, index + 1, row.description || `Task ${index + 1}`);
+                              uploadToSingleStorage(selectedFile, row.id, index + 1, row.description || `Task ${index + 1}`);
                             }, 100);
                           }
                         }}
@@ -2757,7 +2754,7 @@ localStorage.setItem(
                       <button
                         onClick={() => {
                           if (file) {
-                            uploadToDualStorage(file, row.id, index + 1, row.description || `Task ${index + 1}`);
+                            uploadToSingleStorage(file, row.id, index + 1, row.description || `Task ${index + 1}`);
                           } else {
                             document.getElementById(`file-${activeTab}-${index}`)?.click();
                           }
@@ -2807,7 +2804,7 @@ localStorage.setItem(
           </div>
           
           <p className="text-xs text-gray-500 mt-2">
-            File akan diupload ke DUAL Supabase Storage (Primary & Backup) secara otomatis
+            File akan diupload ke Supabase Storage secara otomatis
           </p>
         </>
       )}
@@ -3043,9 +3040,6 @@ const getCurrentLocation = async (manualUpdate = false) => {
   }
 };
 
-  // PERBAIKAN: Fungsi sendLocationToDatabase yang diperbaiki
-
-  // Tambahkan fungsi ini SEBELUM sendLocationToDatabase untuk debugging
 const checkShipmentsStructure = async () => {
   try {
     console.log("Checking shipments table structure...");
@@ -3088,9 +3082,6 @@ useEffect(() => {
   }
 }, [projectId]);
 
-
-// PERBAIKAN FINAL 100% LENGKAP: Fungsi sendLocationToDatabase dengan struktur minimal
-// PERBAIKAN FINAL 100%: Fungsi sendLocationToDatabase
 const sendLocationToDatabase = async (
   latitude: number, 
   longitude: number, 
@@ -3346,40 +3337,6 @@ const sendLocationToDatabase = async (
       alert("❌ Gagal menghapus semua riwayat lokasi");
     }
   };
-
-
-  // Tambahkan fungsi ini di dalam komponen untuk debugging
-const checkShipmentsTable = async () => {
-  try {
-    console.log("Checking shipments table structure...");
-    
-    // Coba insert data minimal
-    const testData = {
-      project_id: projectId,
-      last_lat: -6.2,
-      last_lng: 106.8,
-      address: "Test Location",
-      status: "test",
-      recorded_at: new Date().toISOString()
-    };
-    
-    const { data, error } = await supabase
-      .from("shipments")
-      .insert([testData])
-      .select();
-    
-    if (error) {
-      console.error("Shipments table test error:", error);
-      alert(`❌ Error tabel shipments: ${error.message}\n\nPastikan tabel memiliki kolom yang benar.`);
-    } else {
-      console.log("Shipments table test success:", data);
-      alert("✅ Tabel shipments berfungsi dengan baik!");
-    }
-  } catch (error) {
-    console.error("Check shipments table error:", error);
-  }
-};
-
 
 const retryFailedLocations = async () => {
   try {
@@ -4199,153 +4156,154 @@ export default function SilverPage(): React.JSX.Element {
     }
   };
 
-  const uploadToDualStorage = async (file: File, taskId?: string | null, rowIndex?: number, description?: string) => {
-    if (!file) {
-      alert("Pilih file terlebih dahulu!");
+const uploadToSingleStorage = async (file: File, taskId?: string | null, rowIndex?: number, description?: string) => {
+  if (!file) {
+    alert("Pilih file terlebih dahulu!");
+    return;
+  }
+
+  const rowKey = taskId ? taskId : `row_${rowIndex}`;
+  const uploadKey = rowKey;
+  setUploadingFiles(prev => ({ ...prev, [uploadKey]: true }));
+
+  try {
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File terlalu besar. Maksimal 10MB.");
+      setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
       return;
     }
 
-    const rowKey = taskId ? taskId : `row_${rowIndex}`;
-    const uploadKey = rowKey;
-    setUploadingFiles(prev => ({ ...prev, [uploadKey]: true }));
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
 
-    try {
-      if (file.size > 10 * 1024 * 1024) {
-        alert("File terlalu besar. Maksimal 10MB.");
-        setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
-        return;
-      }
-
-      const allowedTypes = [
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      ];
-
-      if (!allowedTypes.includes(file.type)) {
-        alert("Tipe file tidak didukung. Gunakan gambar, PDF, atau dokumen Office.");
-        setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
-        return;
-      }
-
-      const fileExtension = file.name.split('.').pop();
-      const timestamp = new Date().getTime();
-      const safeDescription = (description || `task_${rowIndex}`).replace(/[^a-zA-Z0-9]/g, '_');
-      const fileName = `${projectId}/${safeDescription}_${timestamp}.${fileExtension}`;
-
-      const result = await DualStorage.upload(file, fileName, 'proofs');
-
-      if (!result.success) {
-        console.error("❌ Dual storage upload error:", result.errors);
-        throw new Error(`Upload gagal: ${result.errors?.join(', ')}`);
-      }
-
-      const publicUrl = result.url || DualStorage.getPublicUrl(fileName, 'primary');
-
-      if (taskId) {
-        const { error: updateError } = await supabase
-          .from("tasks")
-          .update({ 
-            proof_url: publicUrl,
-            is_uploaded: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", taskId);
-
-        if (updateError) {
-          console.error("❌ Database update error:", updateError);
-        }
-      }
-      
-      setFile(null);
-      
-      if (rowIndex !== undefined) {
-        const rowKey = taskId ? taskId : `row_${rowIndex}`;
-        
-        const savedStatusKey = `upload_status_${projectId}_tab${activeTab}`;
-        const savedStatus = localStorage.getItem(savedStatusKey);
-        let statusMap = savedStatus ? JSON.parse(savedStatus) : {};
-        
-        statusMap[rowKey] = true;
-        localStorage.setItem(savedStatusKey, JSON.stringify(statusMap));
-        
-        const updateRows = (rows: TaskType[]) => rows.map((row, idx) => {
-          const normalizedTaskId = taskId || null;
-          const currentRowKey = row.id ? row.id : `row_${idx}`;
-          
-          if ((normalizedTaskId && row.id === normalizedTaskId) || 
-              (!normalizedTaskId && currentRowKey === rowKey)) {
-            return { 
-              ...row, 
-              proof_url: publicUrl, 
-              is_uploaded: true 
-            };
-          }
-          return row;
-        });
-
-        if (activeTab === 1) {
-          setRows(prev => updateRows(prev));
-          localStorage.setItem(LS_KEY, JSON.stringify(updateRows(rows)));
-        } else if (activeTab === 3) {
-          setTargetRows(prev => updateRows(prev));
-          localStorage.setItem(LS_TARGET_KEY, JSON.stringify(updateRows(targetRows)));
-        } else if (activeTab === 4) {
-          setRealisasiRows(prev => updateRows(prev));
-          localStorage.setItem(LS_REALISASI_KEY, JSON.stringify(updateRows(realisasiRows)));
-        }
-      }
-      
-      alert(`✅ File berhasil diupload!\n\n📁 File: ${file.name}\n📝 Task: ${description}\n\nLink: ${publicUrl}`);
-      
-    } catch (err: any) {
-      console.error("❌ Dual upload error:", err);
-      
-      let errorMessage = "Upload gagal: ";
-      if (err.message.includes('database') || err.message.includes('simpan')) {
-        errorMessage = "✅ File berhasil diupload ke storage, tapi gagal menyimpan link ke database. File tetap aman di storage.";
-      } else {
-        errorMessage += err.message || "Silakan coba lagi.";
-      }
-      
-      alert(errorMessage);
-    } finally {
+    if (!allowedTypes.includes(file.type)) {
+      alert("Tipe file tidak didukung. Gunakan gambar, PDF, atau dokumen Office.");
       setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
+      return;
     }
-  };
 
-  const deleteFileFromDualStorage = async (fileUrl: string) => {
-    try {
-      const urlParts = fileUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      const filePath = `${projectId}/${fileName}`;
+    const fileExtension = file.name.split('.').pop();
+    const timestamp = new Date().getTime();
+    const safeDescription = (description || `task_${rowIndex}`).replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `${projectId}/${safeDescription}_${timestamp}.${fileExtension}`;
 
-      const deletePromises = [];
+    // Upload ke supabase storage utama saja
+    const { data, error } = await supabase.storage
+      .from('proofs')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
 
-      deletePromises.push(
-        supabase.storage.from('proofs').remove([filePath])
-      );
+    if (error) {
+      console.error("❌ Upload error:", error);
+      throw new Error(`Upload gagal: ${error.message}`);
+    }
 
-      if (supabase2) {
-        deletePromises.push(
-          supabase2.storage.from('proofs').remove([filePath])
-        );
+    // Dapatkan URL publik
+    const { data: urlData } = supabase.storage
+      .from('proofs')
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+
+    if (taskId) {
+      const { error: updateError } = await supabase
+        .from("tasks")
+        .update({ 
+          proof_url: publicUrl,
+          is_uploaded: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", taskId);
+
+      if (updateError) {
+        console.error("❌ Database update error:", updateError);
       }
-
-      const results = await Promise.allSettled(deletePromises);
+    }
+    
+    setFile(null);
+    
+    if (rowIndex !== undefined) {
+      const rowKey = taskId ? taskId : `row_${rowIndex}`;
       
-      console.log("Primary delete result:", results[0]);
-      if (supabase2) {
-        console.log("Secondary delete result:", results[1]);
-      }
+      const savedStatusKey = `upload_status_${projectId}_tab${activeTab}`;
+      const savedStatus = localStorage.getItem(savedStatusKey);
+      let statusMap = savedStatus ? JSON.parse(savedStatus) : {};
+      
+      statusMap[rowKey] = true;
+      localStorage.setItem(savedStatusKey, JSON.stringify(statusMap));
+      
+      const updateRows = (rows: TaskType[]) => rows.map((row, idx) => {
+        const normalizedTaskId = taskId || null;
+        const currentRowKey = row.id ? row.id : `row_${idx}`;
+        
+        if ((normalizedTaskId && row.id === normalizedTaskId) || 
+            (!normalizedTaskId && currentRowKey === rowKey)) {
+          return { 
+            ...row, 
+            proof_url: publicUrl, 
+            is_uploaded: true 
+          };
+        }
+        return row;
+      });
 
-    } catch (error) {
-      console.error("Error in deleteFileFromDualStorage:", error);
+      if (activeTab === 1) {
+        setRows(prev => updateRows(prev));
+        localStorage.setItem(LS_KEY, JSON.stringify(updateRows(rows)));
+      } else if (activeTab === 3) {
+        setTargetRows(prev => updateRows(prev));
+        localStorage.setItem(LS_TARGET_KEY, JSON.stringify(updateRows(targetRows)));
+      } else if (activeTab === 4) {
+        setRealisasiRows(prev => updateRows(prev));
+        localStorage.setItem(LS_REALISASI_KEY, JSON.stringify(updateRows(realisasiRows)));
+      }
     }
-  };
+    
+    alert(`✅ File berhasil diupload!\n\n📁 File: ${file.name}\n📝 Task: ${description}\n\nLink: ${publicUrl}`);
+    
+  } catch (err: any) {
+    console.error("❌ Upload error:", err);
+    
+    let errorMessage = "Upload gagal: ";
+    if (err.message.includes('database') || err.message.includes('simpan')) {
+      errorMessage = "✅ File berhasil diupload ke storage, tapi gagal menyimpan link ke database. File tetap aman di storage.";
+    } else {
+      errorMessage += err.message || "Silakan coba lagi.";
+    }
+    
+    alert(errorMessage);
+  } finally {
+    setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
+  }
+};
+
+const deleteFileFromStorage = async (fileUrl: string) => {
+  try {
+    const urlParts = fileUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+    const filePath = `${projectId}/${fileName}`;
+
+    // Hapus dari supabase storage utama saja
+    const { error } = await supabase.storage
+      .from('proofs')
+      .remove([filePath]);
+    
+    if (error) {
+      console.error("Delete error:", error);
+    }
+
+  } catch (error) {
+    console.error("Error in deleteFileFromStorage:", error);
+  }
+};
 
   const deleteDateColumn = (dateToDelete: string) => {
     if (!confirm(`Yakin ingin menghapus kolom tanggal "${dateToDelete}"?`)) {
@@ -5014,11 +4972,19 @@ export default function SilverPage(): React.JSX.Element {
         const safeFileName = `${Date.now()}_${audioFile.name}`;
         const remoteName = `${safeProject}/notes/${safeFileName}`;
         
-        const result = await DualStorage.upload(audioFile, remoteName, 'proofs');
+        // PERBAIKAN: Gunakan uploadToSingleStorage untuk audio juga
+        await uploadToSingleStorage(audioFile, null, 0, 'note_audio');
         
-        if (result.success && result.url) {
-          audioUrl = result.url;
-        }
+        // Dapatkan URL publik
+        const fileExtension = audioFile.name.split('.').pop();
+        const timestamp = new Date().getTime();
+        const fileName = `${projectId}/note_audio_${timestamp}.${fileExtension}`;
+        
+        const { data: urlData } = supabase.storage
+          .from('proofs')
+          .getPublicUrl(fileName);
+
+        audioUrl = urlData.publicUrl;
       } catch (error) {
         console.error("Error uploading audio:", error);
       }
@@ -5719,8 +5685,8 @@ export default function SilverPage(): React.JSX.Element {
           uploadingFiles={uploadingFiles}
           setFile={setFile}
           file={file}
-          uploadToDualStorage={uploadToDualStorage}
-          deleteFileFromDualStorage={deleteFileFromDualStorage}
+          uploadToSingleStorage={uploadToSingleStorage}
+          deleteFileFromStorage={deleteFileFromStorage}
           projectId={projectId}
           setRows={setRows}
           setTargetRows={setTargetRows}
@@ -6063,7 +6029,7 @@ export default function SilverPage(): React.JSX.Element {
           </div>
           {audioFile && (
             <p className="text-sm text-green-600">
-              ✅ File audio siap diupload ke DUAL storage: {audioFile.name}
+              ✅ File audio siap diupload ke storage: {audioFile.name}
             </p>
           )}
         </div>
@@ -6333,7 +6299,7 @@ export default function SilverPage(): React.JSX.Element {
                 MECHANICAL - ELECTRICAL - FIRE PROTECTION SYSTEM
               </div>
               <div className="text-xs text-blue-600 font-semibold mt-1">
-                SILVER APP - INPUT DATA LAPANGAN (DUAL STORAGE SYSTEM)
+                SILVER APP - INPUT DATA LAPANGAN
               </div>
             </div>
           </div>
@@ -6524,7 +6490,8 @@ export default function SilverPage(): React.JSX.Element {
               2. ✅ Actual Progress & Plan Progress sama dengan total % dari tabel<br/>
               3. ✅ Perkecil tabel PDF jika terlalu banyak kolom (A3 landscape)<br/>
               4. ✅ <strong>Kolom tanggal kosong saat add date (bisa diisi manual dengan DOUBLE-CLICK pada header)</strong><br/>
-              5. ✅ Tidak ada error 100%
+              5. ✅ <strong>SINGLE STORAGE: Semua upload file sekarang hanya ke Supabase storage utama</strong><br/>
+              6. ✅ Tidak ada error 100%
             </p>
           </div>
         </div>

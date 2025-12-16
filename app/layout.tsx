@@ -17,14 +17,13 @@ export const metadata: Metadata = {
   description: "Monitoring Dashboard by PT Elektrindo",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${robotoMono.variable} antialiased`} suppressHydrationWarning>
+      <body
+        className={`${inter.variable} ${robotoMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>

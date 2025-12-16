@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
-import { supabase, supabase2, DualStorage } from "../../../../lib/supabaseClient";
+import { supabase } from "../../../../lib/supabaseClient";
 import {
   CartesianGrid,
   XAxis,
@@ -85,6 +85,14 @@ type UserPresenceType = {
   last_seen: string;
   active_tab: string;
   editing_task?: string;
+};
+
+type ProjectType = {
+  id: string;
+  name: string;
+  meta: ProjectMetaType;
+  created_at: string;
+  deadline: string;
 };
 
 export default function MasterDashboard(): React.JSX.Element {
@@ -191,9 +199,22 @@ export default function MasterDashboard(): React.JSX.Element {
   const loadProjectData = async () => {
     if (!projectId) return;
 
-    // Load project info
-    const pr = await supabase.from("projects").select("name, meta, created_at, deadline").eq("id", projectId).single();
-    setProjectName(pr.data?.name || `Project ${projectId}`);
+    // Load project info - FIX: Gunakan type assertion yang tepat
+    const { data: projectData, error: projectError } = await supabase
+      .from("projects")
+      .select("name, meta, created_at, deadline")
+      .eq("id", projectId)
+      .single();
+    
+    // Cast data ke tipe yang benar
+    const project = projectData as unknown as ProjectType;
+    
+    // Set project name dengan penanganan null
+    if (project) {
+      setProjectName(project.name || `Project ${projectId}`);
+    } else {
+      setProjectName(`Project ${projectId}`);
+    }
 
     // Load meta project dari localStorage Silver
     const LS_META_PROJECT = `silver:${projectId}:meta_project`;
@@ -205,18 +226,20 @@ export default function MasterDashboard(): React.JSX.Element {
           setMetaProject(parsedMeta);
         } else {
           // Fallback ke data dari database
-          if (pr.data?.meta && typeof pr.data.meta === "object") {
-            setMetaProject(pr.data.meta as ProjectMetaType);
+          if (project?.meta && typeof project.meta === "object") {
+            setMetaProject(project.meta as ProjectMetaType);
           }
         }
       } catch (e) {
         console.warn("invalid meta project:", e);
-        if (pr.data?.meta && typeof pr.data.meta === "object") {
-          setMetaProject(pr.data.meta as ProjectMetaType);
+        if (project?.meta && typeof project.meta === "object") {
+          setMetaProject(project.meta as ProjectMetaType);
         }
       }
-    } else if (pr.data?.meta && typeof pr.data.meta === "object") {
-      setMetaProject(pr.data.meta as ProjectMetaType);
+    } else {
+      if (project?.meta && typeof project.meta === "object") {
+        setMetaProject(project.meta as ProjectMetaType);
+      }
     }
 
     // Load tasks dari database
@@ -344,7 +367,7 @@ export default function MasterDashboard(): React.JSX.Element {
       }
 
       if (data) {
-        const users = data.map(item => item.user_data as UserPresenceType);
+        const users = data.map(item => item as any as UserPresenceType);
         setOnlineUsers(users);
       }
     } catch (error) {
@@ -422,108 +445,105 @@ export default function MasterDashboard(): React.JSX.Element {
     );
   };
 
-// Ganti bagian setupRealtimeSubscriptions() dengan kode berikut:
+  const setupRealtimeSubscriptions = () => {
+    if (!projectId) return;
 
-const setupRealtimeSubscriptions = () => {
-  if (!projectId) return;
-
-  // Realtime untuk tasks
-  const taskCh = supabase
-    .channel(`public:tasks:project_${projectId}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
-      (payload: any) => {
-        if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
-          setTasks((prev) => {
-            const newRow = payload.new as TaskType;
-            const found = prev.find((p) => p.id === newRow.id);
-            if (found) return prev.map((r) => (r.id === newRow.id ? newRow : r));
-            return [newRow, ...prev];
-          });
-        } else if (payload.eventType === "DELETE") {
-          const oldId = payload.old?.id;
-          if (oldId) {
-            setTasks((prev) => prev.filter((r) => r.id !== oldId));
+    // Realtime untuk tasks
+    const taskCh = supabase
+      .channel(`public:tasks:project_${projectId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
+        (payload: any) => {
+          if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
+            setTasks((prev) => {
+              const newRow = payload.new as TaskType;
+              const found = prev.find((p) => p.id === newRow.id);
+              if (found) return prev.map((r) => (r.id === newRow.id ? newRow : r));
+              return [newRow, ...prev];
+            });
+          } else if (payload.eventType === "DELETE") {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              setTasks((prev) => prev.filter((r) => r.id !== oldId));
+            }
           }
         }
-      }
-    )
-    .subscribe();
+      )
+      .subscribe();
 
-  // Realtime untuk shipments
-  const shipCh = supabase
-    .channel(`public:shipments:project_${projectId}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "shipments", filter: `project_id=eq.${projectId}` },
-      (payload: any) => {
-        if (payload.new) {
-          const newShipment = payload.new as ShipmentType;
-          setShipments(prev => {
-            const exists = prev.find(s => s.id === newShipment.id);
-            if (exists) return prev.map(s => s.id === newShipment.id ? newShipment : s);
-            return [newShipment, ...prev].slice(0, 100); // Limit to 100 entries
-          });
-        } else if (payload.eventType === "DELETE") {
-          const oldId = payload.old?.id;
-          if (oldId) {
-            setShipments(prev => prev.filter(s => s.id !== oldId));
+    // Realtime untuk shipments
+    const shipCh = supabase
+      .channel(`public:shipments:project_${projectId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shipments", filter: `project_id=eq.${projectId}` },
+        (payload: any) => {
+          if (payload.new) {
+            const newShipment = payload.new as ShipmentType;
+            setShipments(prev => {
+              const exists = prev.find(s => s.id === newShipment.id);
+              if (exists) return prev.map(s => s.id === newShipment.id ? newShipment : s);
+              return [newShipment, ...prev].slice(0, 100); // Limit to 100 entries
+            });
+          } else if (payload.eventType === "DELETE") {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              setShipments(prev => prev.filter(s => s.id !== oldId));
+            }
           }
         }
-      }
-    )
-    .subscribe();
+      )
+      .subscribe();
 
-  // Realtime untuk notes - PERBAIKAN UTAMA DI SINI
-// PERBAIKAN: Line 296-305 - Ganti .then() dengan .on()
-const noteCh = supabase
-  .channel(`public:project_notes:project_${projectId}`)
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "project_notes", filter: `project_id=eq.${projectId}` },
-    (payload: any) => {  // <-- PERBAIKAN DI SINI
-      if (payload.new) {
-        const newNote = payload.new as NoteType;
-        setNotes(prev => {
-          const exists = prev.find(n => n.id === newNote.id);
-          if (exists) return prev.map(n => n.id === newNote.id ? newNote : n);
-          return [newNote, ...prev];
-        });
-      } else if (payload.eventType === "DELETE") {
-        const oldId = payload.old?.id;
-        if (oldId) {
-          setNotes(prev => prev.filter(n => n.id !== oldId));
+    // Realtime untuk notes
+    const noteCh = supabase
+      .channel(`public:project_notes:project_${projectId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "project_notes", filter: `project_id=eq.${projectId}` },
+        (payload: any) => {
+          if (payload.new) {
+            const newNote = payload.new as NoteType;
+            setNotes(prev => {
+              const exists = prev.find(n => n.id === newNote.id);
+              if (exists) return prev.map(n => n.id === newNote.id ? newNote : n);
+              return [newNote, ...prev];
+            });
+          } else if (payload.eventType === "DELETE") {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              setNotes(prev => prev.filter(n => n.id !== oldId));
+            }
+          }
         }
-      }
-    }
-  )
-  .subscribe();
+      )
+      .subscribe();
 
-  // Realtime untuk user presence
-  const presenceCh = supabase
-    .channel(`user_presence:project_${projectId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'user_presence',
-        filter: `project_id=eq.${projectId}`
-      },
-      (payload: any) => {
-        loadOnlineUsers();
-      }
-    )
-    .subscribe();
+    // Realtime untuk user presence
+    const presenceCh = supabase
+      .channel(`user_presence:project_${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_presence',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload: any) => {
+          loadOnlineUsers();
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(taskCh);
-    supabase.removeChannel(shipCh);
-    supabase.removeChannel(noteCh);
-    supabase.removeChannel(presenceCh);
+    return () => {
+      supabase.removeChannel(taskCh);
+      supabase.removeChannel(shipCh);
+      supabase.removeChannel(noteCh);
+      supabase.removeChannel(presenceCh);
+    };
   };
-};
 
   // Data chart dari Silver App (Planning)
   const planningChartData = useMemo(() => {
@@ -685,7 +705,7 @@ const noteCh = supabase
     [tasks]
   );
 
-  // PERBAIKAN 2: Hitung progress summary dengan benar sesuai Silver App
+  // Hitung progress summary dengan benar sesuai Silver App
   const progressSummary = useMemo(() => {
     // Hitung total bobot
     const totalWeight = tasks.reduce((sum, task) => sum + parseDecimalValue(task.weight), 0);
@@ -751,11 +771,23 @@ const noteCh = supabase
         const safeFileName = `${Date.now()}_${audioFile.name}`;
         const remoteName = `${safeProject}/notes/${safeFileName}`;
         
-        // Upload ke dual storage
-        const result = await DualStorage.upload(audioFile, remoteName, 'proofs');
-        
-        if (result.success && result.url) {
-          audioUrl = result.url;
+        // Upload ke supabase storage
+        const { data, error } = await supabase.storage
+          .from('proofs')
+          .upload(remoteName, audioFile);
+
+        if (error) {
+          console.error("Error uploading audio:", error);
+          throw error;
+        }
+
+        // Dapatkan URL publik
+        const { data: urlData } = supabase.storage
+          .from('proofs')
+          .getPublicUrl(remoteName);
+
+        if (urlData.publicUrl) {
+          audioUrl = urlData.publicUrl;
         }
       } catch (error) {
         console.error("Error uploading audio:", error);
@@ -768,7 +800,7 @@ const noteCh = supabase
       content: newNote,
       audio_url: audioUrl,
       created_by: userId || "unknown",
-    });
+    } as any);
 
     if (!error) {
       setNewNote("");
@@ -1658,7 +1690,7 @@ const noteCh = supabase
           <h3 className="font-semibold mb-4">📎 Dokumen & Bukti Upload dari Silver App</h3>
           <div className="mb-4 p-3 bg-blue-50 rounded border">
             <p className="text-sm text-blue-700">
-              Dokumen ini diupload melalui Silver App menggunakan Dual Storage System (Primary & Backup Supabase)
+              Dokumen ini diupload melalui Silver App menggunakan Supabase Storage
             </p>
           </div>
           
@@ -1681,7 +1713,7 @@ const noteCh = supabase
                         <span className={`text-xs px-2 py-1 rounded ${
                           task.is_uploaded ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                         }`}>
-                          {task.is_uploaded ? '✅ Dual Storage' : '📎 Single'}
+                          {task.is_uploaded ? '✅ Supabase' : '📎 Single'}
                         </span>
                       </div>
                     </div>
@@ -1740,7 +1772,7 @@ const noteCh = supabase
                   </div>
                 </div>
                 <div className="p-2 bg-white rounded border">
-                  <div className="font-medium">Dual Storage</div>
+                  <div className="font-medium">Supabase Storage</div>
                   <div className="text-2xl font-bold text-green-600">
                     {[...tasks, ...targetTasks, ...realisasiTasks].filter(task => task.is_uploaded).length}
                   </div>
@@ -1794,7 +1826,7 @@ const noteCh = supabase
               </div>
               {audioFile && (
                 <p className="text-sm text-green-600">
-                  ✅ File audio siap diupload ke DUAL storage: {audioFile.name}
+                  ✅ File audio siap diupload ke Supabase Storage: {audioFile.name}
                 </p>
               )}
             </div>
@@ -1867,7 +1899,7 @@ const noteCh = supabase
             <ol className="list-decimal list-inside mt-2 text-gray-700 space-y-1">
               <li>Dashboard monitoring ini menampilkan data real-time dari tim lapangan melalui Silver App</li>
               <li>Semua data tersinkronisasi otomatis dengan localStorage Silver App</li>
-              <li>Dual Storage System memastikan keamanan dokumen di dua server Supabase</li>
+              <li>Supabase Storage memastikan keamanan dokumen</li>
               <li>Progress dihitung secara kumulatif sesuai implementasi Silver App</li>
             </ol>
           </div>

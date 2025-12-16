@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { DataGrid } from "react-data-grid";
 import nextDynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase, MasterSchedule, MasterScheduleUpdate } from "../../../lib/supabaseClient"; // <-- IMPORT TIPE BARU
 import {
   LineChart,
   Line,
@@ -27,17 +27,17 @@ const MapTracking = nextDynamic(() => import("../../components/MapTracking"), {
 export default function SilverDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<MasterSchedule[]>([]); // <-- GUNAKAN TIPE YANG DIBUAT
   const [chartData, setChartData] = useState<any[]>([]);
-const [projectName, setProjectName] = useState("Battery Test Project");
+  const [projectName, setProjectName] = useState("Battery Test Project");
 
-useEffect(() => {
-  const saved = typeof window !== "undefined"
-    ? localStorage.getItem("selectedProject")
-    : null;
+  useEffect(() => {
+    const saved = typeof window !== "undefined"
+      ? localStorage.getItem("selectedProject")
+      : null;
 
-  if (saved) setProjectName(saved);
-}, []);
+    if (saved) setProjectName(saved);
+  }, []);
 
   const [loading, setLoading] = useState(true);
 
@@ -87,10 +87,10 @@ useEffect(() => {
         setChartData([]);
         return;
       }
-      const list = data || [];
+      const list = data as MasterSchedule[] || [];
       setRows(list);
       setChartData(
-        list.map((r: any) => ({
+        list.map((r: MasterSchedule) => ({
           name: r.description || "-",
           Plan: Number(r.plan_progress || 0),
           Actual: Number(r.actual_progress || 0),
@@ -103,24 +103,27 @@ useEffect(() => {
     }
   }
 
-  // saat user edit di grid â†’ simpan ke supabase
-  async function onRowsChange(newRows: any[], { indexes }: any) {
+  // saat user edit di grid → simpan ke supabase
+  async function onRowsChange(newRows: MasterSchedule[], { indexes }: any) {
     setRows(newRows);
     const idx = indexes?.[0];
     const updated = typeof idx === "number" ? newRows[idx] : null;
     if (updated && updated.id) {
       try {
+        // Buat objek update dengan tipe yang benar
+        const updateData: MasterScheduleUpdate = {
+          description: updated.description,
+          week_date: updated.week_date,
+          weight: updated.weight,
+          plan_progress: updated.plan_progress,
+          actual_progress: updated.actual_progress,
+          color: updated.color,
+          updated_at: new Date().toISOString(),
+        };
+
         const { error } = await supabase
           .from("master_schedule")
-          .update({
-            description: updated.description,
-            week_date: updated.week_date,
-            weight: updated.weight,
-            plan_progress: updated.plan_progress,
-            actual_progress: updated.actual_progress,
-            color: updated.color,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("id", updated.id);
         if (error) console.error("update error:", error);
       } catch (err) {
@@ -198,7 +201,7 @@ useEffect(() => {
     <div className="p-6 bg-gray-50 min-h-screen space-y-6">
       {/* header */}
       <header className="flex justify-between items-center bg-blue-800 text-white p-4 rounded-md shadow">
-        <h1 className="text-2xl font-bold">ðŸ“˜ Silver Dashboard â€” {projectName}</h1>
+        <h1 className="text-2xl font-bold">📐 Silver Dashboard — {projectName}</h1>
         <button
           onClick={async () => {
             await handleLogout();
@@ -229,7 +232,7 @@ useEffect(() => {
 
       {/* grid editable (excel-like) */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">ðŸ“‹ Master Schedule â€” Editable (Silver)</h2>
+        <h2 className="font-semibold mb-2">📋 Master Schedule — Editable (Silver)</h2>
         <div style={{ height: 420 }}>
           <DataGrid
             columns={columns}
@@ -242,7 +245,7 @@ useEffect(() => {
 
       {/* kurva s */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">ðŸ“ˆ Kurva S (Auto Update)</h2>
+        <h2 className="font-semibold mb-2">📈 Kurva S (Auto Update)</h2>
         <div style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -260,7 +263,7 @@ useEffect(() => {
 
       {/* map */}
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">ðŸ—ºï¸ Lokasi Progress / Pengiriman</h2>
+        <h2 className="font-semibold mb-2">📍 Lokasi Progress / Pengiriman</h2>
         <MapTracking center={mapCenter} />
       </div>
 
@@ -285,4 +288,3 @@ useEffect(() => {
     </div>
   );
 }
-

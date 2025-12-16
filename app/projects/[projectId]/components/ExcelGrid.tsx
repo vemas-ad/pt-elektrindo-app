@@ -153,7 +153,7 @@ export default function ExcelGrid({
         color: r.color,
         assigned_to: r.assigned_to,
         last_update: new Date().toISOString(),
-      })
+      } as any) // Tambahkan type assertion untuk menghindari error TypeScript
       .eq("id", r.id);
   }
 
