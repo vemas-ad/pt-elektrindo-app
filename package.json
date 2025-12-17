@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-"cf:build": "opennextjs-cloudflare build --config open-next.config.js"
+  "cf:build": "npx opennextjs-cloudflare build"
 
   },
   "engines": {
