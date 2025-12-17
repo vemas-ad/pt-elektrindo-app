@@ -2,8 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  serverExternalPackages: ["formidable"],
-
   images: {
     remotePatterns: [
       {

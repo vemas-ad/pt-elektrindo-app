@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
 // react-data-grid menggunakan named export DataGrid
-import { DataGrid } from "react-data-grid";
+import DataGrid from "react-data-grid";
 import nextDynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase, MasterSchedule, MasterScheduleUpdate } from "../../../lib/supabaseClient"; // <-- IMPORT TIPE BARU
