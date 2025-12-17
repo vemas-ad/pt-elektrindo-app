@@ -1,0 +1,13 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/dashboard/master/page": "app/dashboard/master/page.js",
+  "/dashboard/silver/page": "app/dashboard/silver/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/freestorage/upload/route": "app/freestorage/upload/route.js",
+  "/page": "app/page.js",
+  "/projects/[projectId]/master/page": "app/projects/[projectId]/master/page.js",
+  "/projects/[projectId]/page": "app/projects/[projectId]/page.js",
+  "/projects/[projectId]/silver/page": "app/projects/[projectId]/silver/page.js",
+  "/projects/page": "app/projects/page.js"
+}

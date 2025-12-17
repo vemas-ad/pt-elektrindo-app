@@ -42,7 +42,7 @@
     "app/components/leaflet.d.ts",
     "types/react-leaflet.d.ts",
     ".next/dev/types/**/*.ts"
-  ],
+, "open-next.config.js"  ],
   "exclude": [
     "node_modules"
   ]

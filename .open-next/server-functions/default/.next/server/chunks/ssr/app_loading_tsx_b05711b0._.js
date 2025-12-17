@@ -1,0 +1,3 @@
+module.exports=[63588,a=>{"use strict";var b=a.i(7997);function c(){return(0,b.jsx)("div",{className:"flex items-center justify-center min-h-screen",children:(0,b.jsxs)("div",{className:"text-center",children:[(0,b.jsx)("div",{className:"animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"}),(0,b.jsx)("p",{className:"mt-4 text-gray-600",children:"Memuat aplikasi Silver..."})]})})}a.s(["default",()=>c])}];
+
+//# sourceMappingURL=app_loading_tsx_b05711b0._.js.map
